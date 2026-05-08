@@ -1,0 +1,40 @@
+# examples/local.yaml — Safe local lab configuration
+# Use: cyber-range run --config examples/local.yaml
+#
+# This configuration runs simulations ONLY on local authorized fixtures.
+# No external targets. No destructive techniques.
+
+profile: local_lab
+log_level: INFO
+dry_run: false
+
+engagement:
+  allow_external_targets: false  # NEVER change this to true
+  authorized_assets:
+    - iam_role_demo
+    - api_gateway_demo
+    - pipeline_demo
+    - secrets_store_demo
+    - cloud_storage_demo
+    - local_c_lab_service
+    - fixtures.synthetic_logs
+    - fixtures.asset_graph
+  blocked_techniques:
+    - T1485  # Data Destruction — hardcoded blocked
+    - T1561  # Disk Wipe — hardcoded blocked
+    - T1529  # System Shutdown — hardcoded blocked
+  chain_depth: 6
+  max_scenarios: 100
+  timeout_seconds: 300
+
+llm:
+  mode: deterministic  # No API calls required in this mode
+
+retention:
+  max_runs: 20
+  max_age_days: 30
+
+api_key_enabled: false
+cors_allowlist:
+  - "http://localhost:8080"
+  - "http://127.0.0.1:8080"

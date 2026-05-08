@@ -1,0 +1,22 @@
+[package]
+name    = "cyber_range_native"
+version = "2.0.0"
+edition = "2021"
+description = "AI Cyber Range — Native Rust binaries (lab service + evidence validator)"
+
+[[bin]]
+name = "evidence_validator"
+path = "src/main.rs"
+
+[[bin]]
+name = "lab_service"
+path = "src/lab_service.rs"
+
+[dependencies]
+serde      = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+[profile.release]
+opt-level = 3
+lto       = true
+strip     = true

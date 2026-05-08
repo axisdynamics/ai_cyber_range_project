@@ -1,0 +1,76 @@
+{
+  "techniques": [
+    {
+      "id": "T1190",
+      "name": "Exploit Public-Facing Application",
+      "tactic": "Initial Access",
+      "safe_lab_use": "Evaluate whether exposed local demo services have unsafe input handling."
+    },
+    {
+      "id": "T1059",
+      "name": "Command and Scripting Interpreter",
+      "tactic": "Execution",
+      "safe_lab_use": "Validate whether automation paths are constrained and audited in lab workflows."
+    },
+    {
+      "id": "T1053",
+      "name": "Scheduled Task/Job",
+      "tactic": "Persistence",
+      "safe_lab_use": "Check whether scheduled task creation would be detected in synthetic fixture."
+    },
+    {
+      "id": "T1078",
+      "name": "Valid Accounts",
+      "tactic": "Initial Access",
+      "safe_lab_use": "Simulate use of valid credentials against synthetic auth fixture."
+    },
+    {
+      "id": "T1548",
+      "name": "Abuse Elevation Control Mechanism",
+      "tactic": "Privilege Escalation",
+      "safe_lab_use": "Simulate privilege escalation path in local fixture only."
+    },
+    {
+      "id": "T1562",
+      "name": "Impair Defenses",
+      "tactic": "Defense Evasion",
+      "safe_lab_use": "Simulate missing telemetry or disabled controls through synthetic logs only."
+    },
+    {
+      "id": "T1003",
+      "name": "OS Credential Dumping",
+      "tactic": "Credential Access",
+      "safe_lab_use": "Simulate credential access attempt against synthetic secrets fixture."
+    },
+    {
+      "id": "T1082",
+      "name": "System Information Discovery",
+      "tactic": "Discovery",
+      "safe_lab_use": "Enumerate local fixture data to validate discovery detection coverage."
+    },
+    {
+      "id": "T1021",
+      "name": "Remote Services",
+      "tactic": "Lateral Movement",
+      "safe_lab_use": "Simulate lateral movement between local fixture assets only."
+    },
+    {
+      "id": "T1005",
+      "name": "Data from Local System",
+      "tactic": "Collection",
+      "safe_lab_use": "Check whether sensitive fixture files are correctly classified and monitored."
+    },
+    {
+      "id": "T1041",
+      "name": "Exfiltration Over C2 Channel",
+      "tactic": "Exfiltration",
+      "safe_lab_use": "Use synthetic egress events only; no external network transfer."
+    },
+    {
+      "id": "T1499",
+      "name": "Endpoint Denial of Service",
+      "tactic": "Impact",
+      "safe_lab_use": "Simulate availability impact in synthetic fixture only."
+    }
+  ]
+}

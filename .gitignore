@@ -1,0 +1,38 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+venv/
+*.egg-info/
+
+# C build artifacts
+c_service/build/
+c_service/src/*.bak
+
+# Rust build artifacts
+rust_validator/target/
+
+# Frontend build
+web/frontend/dist/
+web/frontend/node_modules/
+
+# Logs and temp files
+*.log
+*.tmp
+*.bak
+.DS_Store
+
+# Reports (generated, not committed)
+python_orchestrator/reports/
+artifacts/
+!artifacts/.gitkeep
+!artifacts/evidence/.gitkeep
+
+# Progress (session state — DO commit history.md, NOT current.md contents)
+# (both files tracked, but current.md should always be in idle state at commit)
+
+# IDE
+.vscode/
+.idea/
+*.swp

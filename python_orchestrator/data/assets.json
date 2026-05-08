@@ -1,0 +1,68 @@
+{
+  "assets": [
+    {
+      "id": "local_c_lab_service",
+      "name": "Servicio C de laboratorio",
+      "type": "local_service",
+      "criticality": 3,
+      "exposure": "local_only",
+      "data_classification": "synthetic"
+    },
+    {
+      "id": "fixtures.synthetic_logs",
+      "name": "Logs sintéticos del blue team",
+      "type": "telemetry_fixture",
+      "criticality": 2,
+      "exposure": "local_file",
+      "data_classification": "synthetic"
+    },
+    {
+      "id": "fixtures.asset_graph",
+      "name": "Grafo de activos demo",
+      "type": "asset_inventory",
+      "criticality": 2,
+      "exposure": "local_file",
+      "data_classification": "synthetic"
+    },
+    {
+      "id": "api_gateway_demo",
+      "name": "API Gateway (demo/synthetic)",
+      "type": "api_gateway",
+      "criticality": 4,
+      "exposure": "internal",
+      "data_classification": "synthetic"
+    },
+    {
+      "id": "pipeline_demo",
+      "name": "Pipeline CI/CD (demo/synthetic)",
+      "type": "pipeline",
+      "criticality": 4,
+      "exposure": "internal",
+      "data_classification": "synthetic"
+    },
+    {
+      "id": "cloud_storage_demo",
+      "name": "Almacenamiento Cloud (demo/synthetic)",
+      "type": "cloud_storage",
+      "criticality": 3,
+      "exposure": "internal",
+      "data_classification": "synthetic"
+    },
+    {
+      "id": "iam_role_demo",
+      "name": "Rol IAM privilegiado (demo/synthetic)",
+      "type": "iam_role",
+      "criticality": 5,
+      "exposure": "internal",
+      "data_classification": "synthetic"
+    },
+    {
+      "id": "secrets_store_demo",
+      "name": "Vault / Secrets Store (demo/synthetic)",
+      "type": "secrets_store",
+      "criticality": 5,
+      "exposure": "internal",
+      "data_classification": "synthetic"
+    }
+  ]
+}

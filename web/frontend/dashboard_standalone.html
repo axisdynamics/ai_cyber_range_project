@@ -1,0 +1,1000 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8"/>
+<meta name="author" content="AxisDynamics — https://axisdynamics.cl"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>AI Cyber Range — Ops Center · AxisDynamics</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&family=Share+Tech+Mono&family=Syne:wght@400;600;800&display=swap" rel="stylesheet"/>
+<script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<script src="https://unpkg.com/recharts@2.12.7/umd/Recharts.js"></script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#07090f;--surface:#0d1117;--surface2:#121a24;--surface3:#182130;
+  --border:#1a2535;--border-hi:rgba(0,200,255,0.25);
+  --text:#cdd6f4;--muted:#6272a4;--dim:#3d4f6b;
+  --red:#ff2d55;--red-dim:rgba(255,45,85,0.15);
+  --orange:#ff6b35;--orange-dim:rgba(255,107,53,0.15);
+  --yellow:#ffd60a;--yellow-dim:rgba(255,214,10,0.12);
+  --green:#30d158;--green-dim:rgba(48,209,88,0.12);
+  --cyan:#00d4ff;--cyan-dim:rgba(0,212,255,0.10);
+  --purple:#bf5af2;
+  --font-display:'Rajdhani',sans-serif;
+  --font-mono:'Share Tech Mono',monospace;
+  --font-body:'Syne',sans-serif;
+  --sidebar:220px;
+}
+html,body,#root{height:100%;background:var(--bg);color:var(--text);font-family:var(--font-body)}
+body{overflow-x:hidden}
+/* Scanline texture */
+body::before{
+  content:'';position:fixed;inset:0;
+  background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,0.04) 2px,rgba(0,0,0,0.04) 4px);
+  pointer-events:none;z-index:9999;
+}
+/* Scrollbar */
+::-webkit-scrollbar{width:4px;height:4px}
+::-webkit-scrollbar-track{background:var(--surface)}
+::-webkit-scrollbar-thumb{background:var(--border-hi);border-radius:2px}
+
+/* Layout */
+.app{display:flex;height:100%;min-height:100vh}
+.sidebar{
+  width:var(--sidebar);min-width:var(--sidebar);
+  background:var(--surface);border-right:1px solid var(--border);
+  display:flex;flex-direction:column;
+  position:sticky;top:0;height:100vh;overflow-y:auto;
+}
+.main{flex:1;overflow-y:auto;display:flex;flex-direction:column;min-width:0}
+.header{
+  background:var(--surface);border-bottom:1px solid var(--border);
+  padding:0 24px;height:56px;display:flex;align-items:center;gap:16px;
+  position:sticky;top:0;z-index:100;
+}
+.content{padding:24px;flex:1}
+
+/* Sidebar */
+.sidebar-logo{
+  padding:16px 16px 8px;
+  border-bottom:1px solid var(--border);margin-bottom:8px;
+}
+.logo-title{
+  font-family:var(--font-display);font-size:17px;font-weight:700;
+  color:var(--cyan);letter-spacing:1px;line-height:1.2;
+}
+.logo-sub{font-family:var(--font-mono);font-size:9px;color:var(--muted);letter-spacing:2px;margin-top:2px}
+.nav-item{
+  display:flex;align-items:center;gap:10px;
+  padding:9px 16px;font-family:var(--font-display);font-size:14px;font-weight:500;
+  color:var(--muted);cursor:pointer;transition:all 0.15s;
+  border-left:2px solid transparent;letter-spacing:0.5px;
+}
+.nav-item:hover{color:var(--text);background:var(--surface2)}
+.nav-item.active{color:var(--cyan);border-left-color:var(--cyan);background:rgba(0,212,255,0.06)}
+.nav-icon{font-size:14px;width:18px;text-align:center}
+.nav-section{
+  padding:8px 16px 4px;
+  font-family:var(--font-mono);font-size:9px;letter-spacing:2px;
+  color:var(--dim);text-transform:uppercase;
+}
+.sidebar-footer{
+  margin-top:auto;padding:12px 16px;border-top:1px solid var(--border);
+  font-family:var(--font-mono);font-size:9px;color:var(--dim);
+}
+
+/* Header */
+.header-title{
+  font-family:var(--font-display);font-size:16px;font-weight:700;
+  color:var(--text);letter-spacing:1px;flex:1;
+}
+.status-pill{
+  display:flex;align-items:center;gap:6px;
+  padding:4px 10px;border-radius:20px;
+  font-family:var(--font-mono);font-size:10px;letter-spacing:1px;
+  border:1px solid;
+}
+.status-pill.idle{color:var(--green);border-color:var(--green);background:var(--green-dim)}
+.status-pill.running{color:var(--yellow);border-color:var(--yellow);background:var(--yellow-dim)}
+.pulse{
+  width:7px;height:7px;border-radius:50%;background:currentColor;
+  animation:pulse 1.5s infinite;
+}
+.pulse.running{animation-duration:0.7s}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.3}}
+.run-btn{
+  padding:6px 14px;background:var(--red-dim);border:1px solid var(--red);
+  color:var(--red);border-radius:4px;font-family:var(--font-mono);font-size:10px;
+  letter-spacing:1px;cursor:pointer;transition:all 0.15s;
+  text-transform:uppercase;
+}
+.run-btn:hover{background:var(--red);color:#fff}
+.run-btn:disabled{opacity:0.4;cursor:not-allowed}
+.last-scan{font-family:var(--font-mono);font-size:10px;color:var(--muted)}
+
+/* Metric cards */
+.cards-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px;margin-bottom:24px}
+.card{
+  background:var(--surface);border:1px solid var(--border);border-radius:6px;
+  padding:16px;position:relative;overflow:hidden;
+  transition:border-color 0.2s;
+}
+.card:hover{border-color:var(--border-hi)}
+.card::before{
+  content:'';position:absolute;top:0;left:0;right:0;height:2px;
+  background:var(--card-accent,var(--cyan));
+}
+.card-label{
+  font-family:var(--font-mono);font-size:9px;letter-spacing:2px;
+  color:var(--muted);text-transform:uppercase;margin-bottom:8px;
+}
+.card-value{
+  font-family:var(--font-display);font-size:36px;font-weight:700;
+  color:var(--card-accent,var(--cyan));line-height:1;
+}
+.card-sub{
+  font-family:var(--font-mono);font-size:10px;color:var(--muted);margin-top:4px;
+}
+
+/* Charts area */
+.charts-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:24px}
+.chart-panel{
+  background:var(--surface);border:1px solid var(--border);border-radius:6px;
+  padding:16px;
+}
+.chart-title{
+  font-family:var(--font-display);font-size:13px;font-weight:600;
+  letter-spacing:1px;color:var(--muted);text-transform:uppercase;
+  margin-bottom:16px;display:flex;align-items:center;gap:8px;
+}
+.chart-title::before{content:'▶';font-size:8px;color:var(--cyan)}
+
+/* Severity badges */
+.badge{
+  display:inline-flex;align-items:center;padding:2px 8px;
+  border-radius:3px;font-family:var(--font-mono);font-size:10px;
+  letter-spacing:1px;font-weight:500;text-transform:uppercase;border:1px solid;
+}
+.badge.critical{color:var(--red);border-color:var(--red);background:var(--red-dim)}
+.badge.high{color:var(--orange);border-color:var(--orange);background:var(--orange-dim)}
+.badge.medium{color:var(--yellow);border-color:var(--yellow);background:var(--yellow-dim)}
+.badge.low{color:var(--green);border-color:var(--green);background:var(--green-dim)}
+.badge.gap{color:var(--red);border-color:var(--red);background:var(--red-dim)}
+.badge.detected{color:var(--green);border-color:var(--green);background:var(--green-dim)}
+.badge.partial{color:var(--yellow);border-color:var(--yellow);background:var(--yellow-dim)}
+
+/* Table */
+.table-wrap{
+  background:var(--surface);border:1px solid var(--border);border-radius:6px;overflow:hidden;
+}
+.table-header{
+  padding:12px 16px;border-bottom:1px solid var(--border);
+  display:flex;align-items:center;justify-content:space-between;gap:12px;
+  background:var(--surface2);
+}
+.table-title{font-family:var(--font-display);font-size:13px;font-weight:600;letter-spacing:1px;text-transform:uppercase}
+.filters{display:flex;gap:8px;flex-wrap:wrap}
+.filter-select{
+  background:var(--surface3);border:1px solid var(--border);border-radius:3px;
+  color:var(--text);font-family:var(--font-mono);font-size:10px;
+  padding:4px 8px;outline:none;cursor:pointer;
+}
+table{width:100%;border-collapse:collapse}
+thead th{
+  padding:10px 12px;text-align:left;
+  font-family:var(--font-mono);font-size:9px;letter-spacing:2px;
+  color:var(--dim);text-transform:uppercase;border-bottom:1px solid var(--border);
+  background:var(--surface2);white-space:nowrap;cursor:pointer;user-select:none;
+}
+thead th:hover{color:var(--cyan)}
+tbody tr{border-bottom:1px solid var(--border);transition:background 0.1s}
+tbody tr:hover{background:var(--surface2)}
+tbody td{
+  padding:9px 12px;font-family:var(--font-mono);font-size:11px;
+  color:var(--text);vertical-align:middle;
+}
+.td-id{color:var(--cyan);font-size:10px}
+.td-muted{color:var(--muted)}
+.score-bar-wrap{display:flex;align-items:center;gap:6px}
+.score-bar{height:4px;border-radius:2px;background:var(--cyan);opacity:0.8}
+.score-num{font-size:10px;color:var(--muted);min-width:30px}
+.poc-check{color:var(--green)}
+
+/* Detector feed */
+.feed{display:flex;flex-direction:column;gap:8px}
+.alert-item{
+  background:var(--surface);border:1px solid var(--border);border-radius:5px;
+  padding:12px 14px;display:flex;align-items:flex-start;gap:12px;
+  transition:border-color 0.15s;
+}
+.alert-item:hover{border-color:var(--border-hi)}
+.alert-item.critical{border-left:3px solid var(--red)}
+.alert-item.high{border-left:3px solid var(--orange)}
+.alert-item.medium{border-left:3px solid var(--yellow)}
+.alert-item.low{border-left:3px solid var(--green)}
+.alert-source{
+  font-family:var(--font-mono);font-size:9px;letter-spacing:1px;
+  color:var(--dim);text-transform:uppercase;padding:2px 6px;
+  border:1px solid var(--border);border-radius:2px;white-space:nowrap;margin-top:1px;
+}
+.alert-source.rule_engine{color:var(--cyan);border-color:var(--cyan)}
+.alert-source.sigma_correlator{color:var(--purple);border-color:var(--purple)}
+.alert-source.ioc_matcher{color:var(--orange);border-color:var(--orange)}
+.alert-source.anomaly_detector{color:var(--yellow);border-color:var(--yellow)}
+.alert-source.llm{color:var(--green);border-color:var(--green)}
+.alert-body{flex:1;min-width:0}
+.alert-title{
+  font-family:var(--font-display);font-size:13px;font-weight:600;
+  color:var(--text);margin-bottom:3px;
+}
+.alert-desc{
+  font-family:var(--font-mono);font-size:10px;color:var(--muted);
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+}
+.alert-meta{
+  display:flex;align-items:center;gap:8px;margin-top:6px;flex-wrap:wrap;
+}
+.meta-tag{
+  font-family:var(--font-mono);font-size:9px;color:var(--dim);
+  padding:1px 5px;border:1px solid var(--border);border-radius:2px;
+}
+.conf-bar{display:flex;align-items:center;gap:4px}
+.conf-pip{width:5px;height:5px;border-radius:50%}
+
+/* Remediation cards */
+.rem-section{margin-bottom:20px}
+.rem-section-title{
+  font-family:var(--font-display);font-size:11px;letter-spacing:2px;text-transform:uppercase;
+  color:var(--muted);margin-bottom:10px;display:flex;align-items:center;gap:8px;
+}
+.rem-section-title::after{content:'';flex:1;height:1px;background:var(--border)}
+.rem-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:10px}
+.rem-card{
+  background:var(--surface);border:1px solid var(--border);border-radius:5px;padding:14px;
+}
+.rem-card-title{
+  font-family:var(--font-display);font-size:13px;font-weight:600;color:var(--text);
+  margin-bottom:8px;line-height:1.3;
+}
+.rem-card-meta{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px}
+.rem-card-controls{
+  font-family:var(--font-mono);font-size:10px;color:var(--muted);
+}
+.rem-card-controls li{margin-left:14px;margin-bottom:2px;color:var(--dim)}
+.owner-badge{
+  font-family:var(--font-mono);font-size:9px;padding:2px 7px;
+  border-radius:10px;border:1px solid;
+}
+.owner-badge.security{color:var(--red);border-color:var(--red)}
+.owner-badge.platform{color:var(--cyan);border-color:var(--cyan)}
+.owner-badge.engineering{color:var(--green);border-color:var(--green)}
+.sla-tag{
+  font-family:var(--font-mono);font-size:9px;padding:2px 7px;
+  border-radius:10px;border:1px solid var(--border);color:var(--muted);
+}
+
+/* Engine stats */
+.engine-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px;margin-bottom:20px}
+.engine-card{
+  background:var(--surface);border:1px solid var(--border);border-radius:5px;
+  padding:12px;text-align:center;
+}
+.engine-num{
+  font-family:var(--font-display);font-size:28px;font-weight:700;
+  color:var(--cyan);line-height:1;
+}
+.engine-label{
+  font-family:var(--font-mono);font-size:9px;color:var(--muted);
+  letter-spacing:1px;text-transform:uppercase;margin-top:4px;
+}
+
+/* Evidence */
+.evd-item{
+  background:var(--surface);border:1px solid var(--border);border-radius:5px;
+  padding:12px 14px;margin-bottom:8px;cursor:pointer;transition:border-color 0.15s;
+}
+.evd-item:hover{border-color:var(--border-hi)}
+.evd-id{font-family:var(--font-mono);font-size:10px;color:var(--cyan)}
+.evd-type{
+  font-family:var(--font-mono);font-size:9px;padding:1px 6px;
+  border:1px solid var(--border);border-radius:2px;color:var(--muted);
+}
+.evd-detail{
+  background:var(--surface3);border:1px solid var(--border);
+  border-radius:3px;padding:10px;margin-top:8px;
+  font-family:var(--font-mono);font-size:10px;color:var(--muted);
+  max-height:200px;overflow-y:auto;word-break:break-all;white-space:pre-wrap;
+}
+
+/* Misc */
+.section-header{
+  display:flex;align-items:center;justify-content:space-between;
+  margin-bottom:16px;
+}
+.section-title{
+  font-family:var(--font-display);font-size:18px;font-weight:700;
+  letter-spacing:1px;color:var(--text);
+}
+.section-sub{font-family:var(--font-mono);font-size:10px;color:var(--muted);margin-top:2px}
+.empty{
+  padding:40px;text-align:center;
+  font-family:var(--font-mono);font-size:12px;color:var(--dim);
+}
+.loading{
+  padding:60px;text-align:center;
+  font-family:var(--font-mono);font-size:12px;color:var(--muted);
+  letter-spacing:2px;
+}
+.loading::after{content:'...';animation:dots 1.5s infinite}
+@keyframes dots{0%{content:'...'}33%{content:'.'}66%{content:'..'}100%{content:'...'}}
+.llm-box{
+  background:rgba(48,209,88,0.05);border:1px solid rgba(48,209,88,0.2);
+  border-radius:5px;padding:14px;margin-bottom:20px;
+}
+.llm-title{
+  font-family:var(--font-display);font-size:12px;font-weight:600;
+  color:var(--green);letter-spacing:1px;text-transform:uppercase;margin-bottom:8px;
+  display:flex;align-items:center;gap:6px;
+}
+.llm-title::before{content:'🤖';font-size:12px}
+.llm-text{font-family:var(--font-mono);font-size:11px;color:var(--muted);line-height:1.5}
+.tag-row{display:flex;flex-wrap:wrap;gap:4px;margin-top:6px}
+.tag{
+  font-family:var(--font-mono);font-size:9px;padding:1px 6px;
+  border-radius:10px;background:var(--surface2);border:1px solid var(--border);
+  color:var(--dim);
+}
+.tab-row{display:flex;gap:2px;padding:0 24px;background:var(--surface);border-bottom:1px solid var(--border)}
+.tab{
+  padding:12px 16px;font-family:var(--font-display);font-size:12px;
+  font-weight:600;letter-spacing:1px;text-transform:uppercase;
+  color:var(--muted);cursor:pointer;border-bottom:2px solid transparent;transition:all 0.15s;
+}
+.tab.active{color:var(--cyan);border-bottom-color:var(--cyan)}
+.tab:hover{color:var(--text)}
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="text/babel">
+const {useState, useEffect, useCallback, useRef} = React;
+const {
+  AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell,
+  XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend
+} = Recharts;
+
+// ─── API ─────────────────────────────────────────────────────────────────────
+const API = {
+  get: async (path) => {
+    try {
+      const r = await fetch(`/api/${path}`);
+      if (!r.ok) throw new Error(r.statusText);
+      return r.json();
+    } catch {
+      // Strip query params before DEMO lookup
+      const base = path.split('?')[0];
+      return DEMO[base] ?? DEMO[path] ?? null;
+    }
+  },
+  post: async (path) => {
+    try {
+      const r = await fetch(`/api/${path}`, {method:'POST'});
+      return r.json();
+    } catch { return null; }
+  }
+};
+
+// ─── Demo data (used when API unreachable) ─────────────────────────────────
+const _FINDINGS = [
+  {id:'FND-SCN-iam_role_demo-T1078',asset:'iam_role_demo',technique_id:'T1078',severity:'critical',detection_status:'gap',score:100,reproducible:true,poc_id:'POC-001',tactic:'Initial Access',summary:'Credencial válida expuesta sin MFA'},
+  {id:'FND-SCN-iam_role_demo-T1548',asset:'iam_role_demo',technique_id:'T1548',severity:'critical',detection_status:'gap',score:100,reproducible:true,poc_id:'POC-002',tactic:'Privilege Escalation',summary:'Escalación de privilegios vía sudo NOPASSWD'},
+  {id:'FND-SCN-iam_role_demo-T1003',asset:'iam_role_demo',technique_id:'T1003',severity:'critical',detection_status:'gap',score:100,reproducible:true,poc_id:'POC-003',tactic:'Credential Access',summary:'Acceso a secrets store sin autenticación'},
+  {id:'FND-SCN-secrets_store_demo-T1003',asset:'secrets_store_demo',technique_id:'T1003',severity:'critical',detection_status:'gap',score:100,reproducible:true,poc_id:'POC-004',tactic:'Credential Access',summary:'Dump de credenciales desde secrets store'},
+  {id:'FND-SCN-api_gateway_demo-T1078',asset:'api_gateway_demo',technique_id:'T1078',severity:'critical',detection_status:'gap',score:95,reproducible:true,poc_id:'POC-005',tactic:'Initial Access',summary:'Token sintético aceptado sin validación'},
+  {id:'FND-SCN-api_gateway_demo-T1041',asset:'api_gateway_demo',technique_id:'T1041',severity:'critical',detection_status:'gap',score:95,reproducible:true,poc_id:'POC-006',tactic:'Exfiltration',summary:'Canal DNS de exfiltración no detectado'},
+  {id:'FND-SCN-pipeline_demo-T1548',asset:'pipeline_demo',technique_id:'T1548',severity:'critical',detection_status:'gap',score:95,reproducible:true,poc_id:'POC-007',tactic:'Privilege Escalation',summary:'CI/CD pipeline sin restricción de elevación'},
+  {id:'FND-SCN-api_gateway_demo-T1059',asset:'api_gateway_demo',technique_id:'T1059',severity:'high',detection_status:'gap',score:87,reproducible:true,poc_id:'POC-008',tactic:'Execution',summary:'Inyección de shell no bloqueada'},
+  {id:'FND-SCN-pipeline_demo-T1021',asset:'pipeline_demo',technique_id:'T1021',severity:'high',detection_status:'gap',score:87,reproducible:true,poc_id:'POC-009',tactic:'Lateral Movement',summary:'Movimiento lateral entre fixtures sin restricción'},
+  {id:'FND-SCN-cloud_storage_demo-T1041',asset:'cloud_storage_demo',technique_id:'T1041',severity:'high',detection_status:'gap',score:82,reproducible:true,poc_id:'POC-010',tactic:'Exfiltration',summary:'Egress sin DLP ni filtrado'},
+  {id:'FND-SCN-local_c_lab_service-T1190',asset:'local_c_lab_service',technique_id:'T1190',severity:'high',detection_status:'detected',score:62,reproducible:true,poc_id:'POC-011',tactic:'Initial Access',summary:'Buffer overflow detectado por validación'},
+  {id:'FND-SCN-local_c_lab_service-T1078',asset:'local_c_lab_service',technique_id:'T1078',severity:'high',detection_status:'detected',score:62,reproducible:true,poc_id:'POC-012',tactic:'Initial Access',summary:'Auth con token sintético detectada'},
+];
+const _ALERTS = [
+  {id:'ALT-001',source:'rule_engine',severity:'critical',confidence:.90,title:'[Rule] Shell Metacharacter Injection',description:'RULE-002 disparada · metacaracter ";" detectado en input de exec',tactic:'Execution',technique_ids:['T1059'],asset_id:'api_gateway_demo',rule_or_ioc_id:'RULE-002',requires_llm_review:false,detected_at:'2026-05-08T16:40:52Z'},
+  {id:'ALT-002',source:'sigma_correlator',severity:'critical',confidence:.95,title:'[Sigma] Kill Chain: Initial Access → Credential Access',description:'Secuencia T1078 → T1059 → T1003 completada en ventana de 5 min',tactic:'Kill Chain',technique_ids:['T1190','T1003','T1078'],asset_id:'multi-asset',rule_or_ioc_id:'COR-002',requires_llm_review:false,detected_at:'2026-05-08T16:40:53Z'},
+  {id:'ALT-003',source:'ioc_matcher',severity:'critical',confidence:1.0,title:'[IoC] Exfiltration Marker detectado',description:"IOC-002 (SYNTHETIC_EXFIL_EVENT_NO_REAL_DATA) encontrado en stdout",tactic:'Exfiltration',technique_ids:['T1041'],asset_id:'api_gateway_demo',rule_or_ioc_id:'IOC-002',requires_llm_review:false,detected_at:'2026-05-08T16:40:54Z'},
+  {id:'ALT-004',source:'rule_engine',severity:'critical',confidence:.80,title:'[Rule] Privilege Escalation Simulation',description:'RULE-005 disparada · SYNTHETIC_PRIVILEGE_TEST en stdout',tactic:'Privilege Escalation',technique_ids:['T1548'],asset_id:'iam_role_demo',rule_or_ioc_id:'RULE-005',requires_llm_review:false,detected_at:'2026-05-08T16:40:55Z'},
+  {id:'ALT-005',source:'anomaly_detector',severity:'high',confidence:.78,title:'[Anomaly] detection_gap_rate (Z=2.8σ)',description:'Tasa de evasión 65.8% supera baseline por 2.8 desviaciones estándar',tactic:'Statistical Anomaly',technique_ids:[],asset_id:'all',rule_or_ioc_id:'METRIC-gap_rate',requires_llm_review:false,detected_at:'2026-05-08T16:40:56Z'},
+  {id:'ALT-006',source:'ioc_matcher',severity:'critical',confidence:1.0,title:'[IoC] Credential Token en stdout',description:'IOC-001 (SYNTHETIC_VALID_TOKEN_1234) encontrado · técnica T1078',tactic:'Credential Access',technique_ids:['T1078'],asset_id:'iam_role_demo',rule_or_ioc_id:'IOC-001',requires_llm_review:false,detected_at:'2026-05-08T16:40:57Z'},
+  {id:'ALT-007',source:'sigma_correlator',severity:'critical',confidence:.93,title:'[Sigma] Privilege Escalation en activo crítico',description:'T1548 sobre iam_role_demo (criticality=5) · 1 evento en ventana 1h',tactic:'Privilege Escalation',technique_ids:['T1548'],asset_id:'iam_role_demo',rule_or_ioc_id:'COR-006',requires_llm_review:false,detected_at:'2026-05-08T16:40:58Z'},
+];
+const _REMEDIATION_TICKETS = [
+  {id:'REM-001',finding_id:'FND-SCN-iam_role_demo-T1078',title:'[CRITICAL] Harden iam_role_demo contra T1078 (score: 100.0)',priority:1,owner_team:'security',sla_days:1,status:'open',controls_to_apply:['Enforcer MFA para todas las cuentas interactivas y de servicio','Rotar credenciales comprometidas inmediatamente','Implementar detección de anomalías de credenciales (UEBA)'],detection_rules_needed:['Crear caso de uso SIEM para esta variante de técnica','PRIORITY: Crear regla de detección para T1078 — actualmente ZERO cobertura']},
+  {id:'REM-002',finding_id:'FND-SCN-iam_role_demo-T1548',title:'[CRITICAL] Harden iam_role_demo contra T1548 (score: 100.0)',priority:1,owner_team:'security',sla_days:1,status:'open',controls_to_apply:['Auditar reglas sudo y eliminar NOPASSWD','Habilitar logging PAM para eventos de elevación','Implementar modelo de acceso privilegiado just-in-time'],detection_rules_needed:['EDR: Alerta en cambio de UID no autorizado','PAM: Logging de todas las elevaciones a storage inmutable','PRIORITY: Crear regla de detección para T1548']},
+  {id:'REM-003',finding_id:'FND-SCN-secrets_store_demo-T1003',title:'[CRITICAL] Harden secrets_store_demo contra T1003 (score: 100.0)',priority:1,owner_team:'security',sla_days:1,status:'open',controls_to_apply:['Habilitar LSA protection / Credential Guard','Restringir lecturas de memoria LSASS vía política EDR','Rotar todos los secretos expuestos por el evento de credential access'],detection_rules_needed:['EDR: Alerta en lectura de memoria LSASS desde proceso no-sistema','SIEM: Alerta en acceso a /etc/shadow o SAM de Windows','PRIORITY: Crear regla de detección para T1003']},
+  {id:'REM-004',finding_id:'FND-SCN-api_gateway_demo-T1059',title:'[HIGH] Harden api_gateway_demo contra T1059 (score: 87.0)',priority:2,owner_team:'platform',sla_days:7,status:'open',controls_to_apply:['Restringir ejecución de scripts via allowlist (AppLocker, seccomp)','Reemplazar shell=True con arrays de argumentos explícitos','Audit logging de comandos (auditd, eBPF) para todos los intérpretes'],detection_rules_needed:['EDR: Alerta en intérprete de scripting inesperado desde cuenta de servicio','SIEM: Regla Sigma para metacaracteres shell en argumentos de proceso']},
+  {id:'REM-005',finding_id:'FND-SCN-pipeline_demo-T1021',title:'[HIGH] Harden pipeline_demo contra T1021 (score: 87.0)',priority:2,owner_team:'platform',sla_days:7,status:'open',controls_to_apply:['Enforcer segmentación de red y micro-segmentación','Restringir SSH/RDP/WinRM lateral a hosts de gestión autorizados','Desplegar monitoreo de tráfico east-west'],detection_rules_needed:['Network: Alerta en SSH desde workstation a servicio interno','East-west: Baseline de comunicación inter-servicio, alerta en nuevos flujos']},
+  {id:'REM-006',finding_id:'FND-SCN-cloud_storage_demo-T1041',title:'[HIGH] Harden cloud_storage_demo contra T1041 (score: 82.0)',priority:2,owner_team:'security',sla_days:7,status:'open',controls_to_apply:['Implementar filtrado de egress con allowlist de destinos','Desplegar DLP con inspección de red para transferencias salientes','Habilitar monitoreo DNS / sinkholing para dominios anómalos'],detection_rules_needed:['Network: Alerta DLP en transferencia saliente >100MB a destino desconocido','DNS: Alerta en consultas a dominios *.invalid o recién registrados']},
+  {id:'REM-007',finding_id:'FND-SCN-iam_role_demo-T1053',title:'[MEDIUM] Harden iam_role_demo contra T1053 (score: 80.0)',priority:3,owner_team:'platform',sla_days:30,status:'open',controls_to_apply:['Auditar y podar todas las tareas programadas / cron jobs','Monitorear cambios en crontab y at-jobs via FIM','Restringir permisos de escritura en cron a usuarios autorizados'],detection_rules_needed:['FIM: Alerta en modificación de /etc/crontab o /etc/cron.d','Audit: Logging de creación de at-jobs']},
+  {id:'REM-008',finding_id:'FND-SCN-local_c_lab_service-T1190',title:'[LOW] Harden local_c_lab_service contra T1190 (score: 40.0)',priority:4,owner_team:'engineering',sla_days:90,status:'open',controls_to_apply:['Input validation hardening en todos los límites de API/servicio','Dependency scanning + patching (SCA en CI)','Flags de hardening en tiempo de compilación (-fstack-protector-strong, RELRO)'],detection_rules_needed:['SIEM: Alerta en spike de HTTP 5xx desde IP única','WAF: Regla para cuerpos de request sobredimensionados (>8KB)']},
+];
+const _EVIDENCE = [
+  {id:'EVD-A1B2C3D4',asset_id:'iam_role_demo',technique_id:'T1078',evidence_type:'stdout',hash_sha256:'a1b2c3d4e5f6789012345678901234567890123456789012345678901234abcd',chain_of_custody:['collected by RedTeamAgent at 2026-05-08T16:40:52Z','validated by blue_team_agent at 2026-05-08T16:40:58Z'],collector:'RedTeamAgent',collected_at:'2026-05-08T16:40:52Z',content:'AUTH_OK: SYNTHETIC_VALID_TOKEN_1234 user=admin technique=T1078
+credential_check: access_granted=true user=admin'},
+  {id:'EVD-B2C3D4E5',asset_id:'api_gateway_demo',technique_id:'T1041',evidence_type:'stdout',hash_sha256:'b2c3d4e5f678901234567890123456789012345678901234567890abcdef12',chain_of_custody:['collected by RedTeamAgent at 2026-05-08T16:40:53Z'],collector:'RedTeamAgent',collected_at:'2026-05-08T16:40:53Z',content:'EXFIL: SYNTHETIC_EXFIL_EVENT_NO_REAL_DATA data_len=17 technique=T1041
+Simulated DNS query to synthetic.attacker.invalid'},
+  {id:'EVD-C3D4E5F6',asset_id:'pipeline_demo',technique_id:'T1548',evidence_type:'stdout',hash_sha256:'c3d4e5f6789012345678901234567890123456789012345678901234abcdef',chain_of_custody:['collected by RedTeamAgent at 2026-05-08T16:40:54Z'],collector:'RedTeamAgent',collected_at:'2026-05-08T16:40:54Z',content:'PRIVESC_CHECK: SYNTHETIC_PRIVILEGE_TEST technique=T1548
+privesc_findings=1 technique=T1548'},
+  {id:'EVD-D4E5F6A7',asset_id:'secrets_store_demo',technique_id:'T1003',evidence_type:'log',hash_sha256:'d4e5f6a7890123456789012345678901234567890123456789012345abcde1',chain_of_custody:['collected by RedTeamAgent at 2026-05-08T16:40:55Z'],collector:'RedTeamAgent',collected_at:'2026-05-08T16:40:55Z',content:'COLLECT: path=python_orchestrator/data/assets.json technique=T1005,T1003
+SENSITIVE_FILE_ACCESS: data_classification=confidential'},
+  {id:'EVD-E5F6A7B8',asset_id:'api_gateway_demo',technique_id:'T1059',evidence_type:'stdout',hash_sha256:'e5f6a7b890123456789012345678901234567890123456789012345abcdef2',chain_of_custody:['collected by RedTeamAgent at 2026-05-08T16:40:56Z'],collector:'RedTeamAgent',collected_at:'2026-05-08T16:40:56Z',content:'EXEC_BLOCKED: injection_detected technique=T1059
+WARN: input_validation_warning shell_metacharacter=";" technique=T1059'},
+];
+const DEMO = {
+  status:  {status:'idle',run_id:'RUN-DEMO-001',program:{name:'AI Cyber Range — Demo Mode'}},
+  summary: {
+    findings_count:35,critical_count:8,high_count:13,medium_count:11,low_count:3,
+    coverage_pct:97.2,detection_gap_pct:65.8,hypotheses_generated:36,
+    chains_simulated:36,evasion_tests_run:84,pocs_built:36,
+    run_id:'RUN-DEMO-001',scenario_count:39,open_tickets:35,sla_breach_count:8,
+    started_at:'2026-05-08T16:40:52Z',finished_at:'2026-05-08T16:40:53Z',
+    top_findings: _FINDINGS.slice(0,6),
+  },
+  findings:   {count:12,total:35,findings:_FINDINGS},
+  detections: {
+    total_events_processed:113,rule_matches:7,correlation_alerts:4,
+    ioc_matches:6,anomaly_alerts:2,llm_enrichments:0,novel_events_count:3,
+    llm_analysis_summary:'Modo demo — 3 eventos novedosos sin cobertura determinística. Patrones de escalación en activos IAM requieren revisión prioritaria.',
+    engine_stats:{rule_engine_rules:12,sigma_rules:7,ioc_count:12,tracked_metrics:5,
+      llm_available:false,mythos_available:false,mythos_experts:9,mythos_last_loops:0,
+      mythos_last_converged:false,mythos_spectral_profile:[],new_rules_from_llm:0},
+    all_alerts: _ALERTS,
+    new_rules_suggested:[],
+  },
+  metrics: {
+    coverage_pct:97.2,detection_gap_pct:65.8,techniques_tested:12,assets_tested:8,
+    pocs_with_evidence:36,evasion_tests:84,
+    score_distribution:[{range:'90-100',count:5},{range:'70-89',count:10},{range:'50-69',count:13},{range:'0-49',count:7}],
+    severity_breakdown:{critical:8,high:13,medium:11,low:3},
+    detection_by_status:{gap:23,detected:12},
+    findings_by_tactic:{'Initial Access':8,'Execution':4,'Credential Access':6,'Privilege Escalation':4,'Defense Evasion':3,'Lateral Movement':4,'Exfiltration':4,'Impact':2},
+  },
+  chains: {
+    chains_simulated:36,
+    top_findings: _FINDINGS.slice(0,6),
+    cicd_events:[{type:'code_change',file:'configs/default.yaml'},{type:'code_change',file:'python_orchestrator/main.py'}],
+    engagement_id:'ENG-001',
+  },
+  remediation: {
+    total:35,
+    by_priority:{
+      critical: _REMEDIATION_TICKETS.filter(t=>t.sla_days<=1),
+      high:     _REMEDIATION_TICKETS.filter(t=>t.sla_days>1&&t.sla_days<=7),
+      medium:   _REMEDIATION_TICKETS.filter(t=>t.sla_days>7&&t.sla_days<=30),
+      low:      _REMEDIATION_TICKETS.filter(t=>t.sla_days>30),
+    },
+    tickets: _REMEDIATION_TICKETS,
+    summary:{open:35,by_owner:{security:20,platform:12,engineering:3}},
+  },
+  evidence: {
+    summary:{total_records:78,by_type:{stdout:39,log:39},assets_covered:8,techniques_covered:12},
+    records: _EVIDENCE,
+    count:5,
+  },
+};
+
+// ─── Severity colors ───────────────────────────────────────────────────────
+const SEV_COLORS = {critical:'#ff2d55',high:'#ff6b35',medium:'#ffd60a',low:'#30d158',gap:'#ff2d55',detected:'#30d158',partial:'#ffd60a'};
+const SOURCE_LABELS = {rule_engine:'RULE',sigma_correlator:'SIGMA',ioc_matcher:'IOC',anomaly_detector:'ANOMALY',llm:'LLM'};
+
+// ─── Components ───────────────────────────────────────────────────────────────
+const Badge = ({val, label}) => <span className={`badge ${val}`}>{label||val}</span>;
+const Conf = ({v}) => {
+  const pips = [0.2,0.4,0.6,0.8,1.0].map(t=>({fill:v>=t}));
+  return <div className="conf-bar">{pips.map((p,i)=><div key={i} className="conf-pip" style={{background:p.fill?'var(--cyan)':'var(--border)'}}/>)}</div>;
+};
+
+// ─── Overview ─────────────────────────────────────────────────────────────────
+function Overview({summary, metrics}) {
+  if (!summary) return <div className="loading">Cargando resumen</div>;
+  const {critical_count:c,high_count:h,medium_count:m,low_count:l} = summary;
+  const sevData = [{name:'Critical',value:c,color:'#ff2d55'},{name:'High',value:h,color:'#ff6b35'},{name:'Medium',value:m,color:'#ffd60a'},{name:'Low',value:l,color:'#30d158'}];
+  const scoreData = (metrics?.score_distribution||[]).map(b=>({...b,name:b.range}));
+  const tacticData = Object.entries(metrics?.findings_by_tactic||{}).map(([name,count])=>({name,count})).sort((a,b)=>b.count-a.count).slice(0,7);
+
+  const cards = [
+    {label:'Total Findings',value:summary.findings_count,sub:`${summary.scenario_count||'—'} scenarios`,accent:'var(--cyan)'},
+    {label:'Critical',value:c,sub:'SLA: 1 día',accent:'var(--red)'},
+    {label:'High',value:h,sub:'SLA: 7 días',accent:'var(--orange)'},
+    {label:'ATT&CK Coverage',value:`${summary.coverage_pct}%`,sub:`${summary.hypotheses_generated} hipótesis`,accent:'var(--green)'},
+    {label:'Detection Gap',value:`${summary.detection_gap_pct}%`,sub:`${summary.evasion_tests_run} tests`,accent:'var(--yellow)'},
+    {label:'PoCs Built',value:summary.pocs_built,sub:'reproducibles',accent:'var(--purple)'},
+    {label:'Kill Chains',value:summary.chains_simulated,sub:'multi-step',accent:'var(--cyan)'},
+    {label:'Open Tickets',value:summary.open_tickets||0,sub:`${summary.sla_breach_count||0} SLA breach`,accent:summary.sla_breach_count>0?'var(--red)':'var(--muted)'},
+  ];
+  return <>
+    <div className="section-header">
+      <div>
+        <div className="section-title">Resumen Ejecutivo</div>
+        <div className="section-sub">RUN: {summary.run_id} · {summary.finished_at?.substring(0,19).replace('T',' ')||'—'}</div>
+      </div>
+    </div>
+    <div className="cards-grid">
+      {cards.map(c=><div key={c.label} className="card" style={{'--card-accent':c.accent}}>
+        <div className="card-label">{c.label}</div>
+        <div className="card-value">{c.value}</div>
+        <div className="card-sub">{c.sub}</div>
+      </div>)}
+    </div>
+    <div className="charts-grid">
+      <div className="chart-panel">
+        <div className="chart-title">Hallazgos por Severidad</div>
+        <ResponsiveContainer width="100%" height={200}>
+          <PieChart><Pie data={sevData} cx="50%" cy="50%" innerRadius={55} outerRadius={80} paddingAngle={3} dataKey="value">
+            {sevData.map((e,i)=><Cell key={i} fill={e.color} opacity={0.85}/>)}
+          </Pie><Tooltip contentStyle={{background:'#0d1117',border:'1px solid #1a2535',fontFamily:'Share Tech Mono',fontSize:11}}/>
+          <Legend iconType="circle" iconSize={8} wrapperStyle={{fontFamily:'Share Tech Mono',fontSize:10}}/>
+          </PieChart>
+        </ResponsiveContainer>
+      </div>
+      <div className="chart-panel">
+        <div className="chart-title">Distribución de Risk Score</div>
+        <ResponsiveContainer width="100%" height={200}>
+          <BarChart data={scoreData}>
+            <CartesianGrid strokeDasharray="2 2" stroke="#1a2535"/>
+            <XAxis dataKey="name" tick={{fontFamily:'Share Tech Mono',fontSize:10,fill:'#6272a4'}} axisLine={false}/>
+            <YAxis tick={{fontFamily:'Share Tech Mono',fontSize:10,fill:'#6272a4'}} axisLine={false} tickLine={false}/>
+            <Tooltip contentStyle={{background:'#0d1117',border:'1px solid #1a2535',fontFamily:'Share Tech Mono',fontSize:11}}/>
+            <Bar dataKey="count" radius={[3,3,0,0]}>
+              {scoreData.map((_,i)=>{
+                const colors=['#ff2d55','#ff6b35','#ffd60a','#30d158'];
+                return <Cell key={i} fill={colors[i]||'#00d4ff'}/>;
+              })}
+            </Bar>
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
+      <div className="chart-panel" style={{gridColumn:'span 2'}}>
+        <div className="chart-title">Hallazgos por Táctica ATT&CK</div>
+        <ResponsiveContainer width="100%" height={180}>
+          <BarChart data={tacticData} layout="vertical">
+            <CartesianGrid strokeDasharray="2 2" stroke="#1a2535" horizontal={false}/>
+            <XAxis type="number" tick={{fontFamily:'Share Tech Mono',fontSize:10,fill:'#6272a4'}} axisLine={false}/>
+            <YAxis dataKey="name" type="category" width={150} tick={{fontFamily:'Share Tech Mono',fontSize:10,fill:'#6272a4'}} axisLine={false} tickLine={false}/>
+            <Tooltip contentStyle={{background:'#0d1117',border:'1px solid #1a2535',fontFamily:'Share Tech Mono',fontSize:11}}/>
+            <Bar dataKey="count" fill="#00d4ff" opacity={0.8} radius={[0,3,3,0]}/>
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
+    </div>
+  </>;
+}
+
+// ─── Findings Table ────────────────────────────────────────────────────────────
+function Findings() {
+  const [data,setData]=useState(null);
+  const [sev,setSev]=useState('');
+  const [det,setDet]=useState('');
+  const [sort,setSort]=useState({key:'score',dir:-1});
+  useEffect(()=>{API.get(`findings?severity=${sev}&detection_status=${det}&limit=50`).then(setData);},[sev,det]);
+  const toggle=(k)=>setSort(s=>s.key===k?{key:k,dir:s.dir*-1}:{key:k,dir:-1});
+  const sorted=(data?.findings||[]).slice().sort((a,b)=>{
+    const av=a[sort.key]??'',bv=b[sort.key]??'';
+    return typeof av==='number'?((av-bv)*sort.dir):(String(av).localeCompare(String(bv))*sort.dir);
+  });
+  const arrow=(k)=>sort.key===k?(sort.dir>0?'▲':'▼'):'';
+  return <>
+    <div className="section-header">
+      <div>
+        <div className="section-title">Hallazgos</div>
+        <div className="section-sub">{data?.total||0} total · {data?.count||0} mostrando</div>
+      </div>
+    </div>
+    <div className="table-wrap">
+      <div className="table-header">
+        <span className="table-title">Findings</span>
+        <div className="filters">
+          <select className="filter-select" value={sev} onChange={e=>{setSev(e.target.value);setData(null)}}>
+            <option value="">All Severity</option>
+            {['critical','high','medium','low'].map(s=><option key={s} value={s}>{s}</option>)}
+          </select>
+          <select className="filter-select" value={det} onChange={e=>{setDet(e.target.value);setData(null)}}>
+            <option value="">All Detection</option>
+            {['gap','detected','partial'].map(s=><option key={s} value={s}>{s}</option>)}
+          </select>
+        </div>
+      </div>
+      {!data?<div className="loading">Cargando hallazgos</div>:<table>
+        <thead><tr>
+          {[['id','ID'],['asset','ACTIVO'],['technique_id','ATT&CK'],['severity','SEVERIDAD'],['detection_status','DETECCIÓN'],['poc_id','POC'],['score','SCORE']].map(([k,l])=>
+            <th key={k} onClick={()=>toggle(k)}>{l} {arrow(k)}</th>)}
+        </tr></thead>
+        <tbody>{sorted.map(f=><tr key={f.id}>
+          <td><span className="td-id">{f.id.replace('FND-SCN-','')}</span></td>
+          <td><span style={{color:'var(--text)',fontSize:10}}>{f.asset}</span></td>
+          <td><span style={{color:'var(--cyan)',fontFamily:'Share Tech Mono',fontSize:10}}>{f.technique_id}</span></td>
+          <td><Badge val={f.severity}/></td>
+          <td><Badge val={f.detection_status}/></td>
+          <td>{f.poc_id?<span className="poc-check">✓</span>:<span className="td-muted">—</span>}</td>
+          <td><div className="score-bar-wrap">
+            <div className="score-bar" style={{width:`${f.score}px`,maxWidth:80}}/>
+            <span className="score-num">{f.score}</span>
+          </div></td>
+        </tr>)}</tbody>
+      </table>}
+    </div>
+  </>;
+}
+
+// ─── Detector Feed ─────────────────────────────────────────────────────────────
+function Detectors() {
+  const [data,setData]=useState(null);
+  const [loading,setLoading]=useState(false);
+  const [tab,setTab]=useState('alerts');
+  const load=useCallback(()=>{setLoading(true);API.get('detections').then(d=>{setData(d);setLoading(false);});},[]);
+  useEffect(()=>{load();},[]);
+  const alerts=data?.all_alerts||[];
+  const stats=data?.engine_stats||{};
+  const llmSummary=data?.llm_analysis_summary||'';
+  const engineCards=[
+    {num:stats.rule_engine_rules||0,label:'Reglas Activas',color:'var(--cyan)'},
+    {num:stats.sigma_rules||0,label:'Reglas Sigma',color:'var(--purple)'},
+    {num:stats.ioc_count||0,label:'IoCs Cargados',color:'var(--orange)'},
+    {num:data?.rule_matches||0,label:'Rule Matches',color:'var(--cyan)'},
+    {num:data?.correlation_alerts||0,label:'Correlaciones',color:'var(--purple)'},
+    {num:data?.ioc_matches||0,label:'IoC Hits',color:'var(--orange)'},
+    {num:data?.anomaly_alerts||0,label:'Anomalías',color:'var(--yellow)'},
+    {num:data?.llm_enrichments||0,label:'LLM Enriched',color:'var(--green)'},
+  ];
+  return <>
+    <div className="section-header">
+      <div>
+        <div className="section-title">Detection Engine</div>
+        <div className="section-sub">{data?.total_events_processed||0} eventos procesados · {alerts.length} alertas</div>
+      </div>
+      <button className="run-btn" onClick={load} disabled={loading}>{loading?'ANALIZANDO...':'↺ RE-ANALIZAR'}</button>
+    </div>
+    <div className="engine-grid">
+      {engineCards.map(e=><div key={e.label} className="engine-card">
+        <div className="engine-num" style={{color:e.color}}>{e.num}</div>
+        <div className="engine-label">{e.label}</div>
+      </div>)}
+    </div>
+    {llmSummary&&<div className="llm-box">
+      <div className="llm-title">{stats.llm_available?'LLM Enrichment Active':'LLM Analysis (Offline Mode)'}</div>
+      <div className="llm-text">{llmSummary}</div>
+      {data?.new_rules_suggested?.length>0&&<div className="tag-row">
+        <span style={{fontFamily:'Share Tech Mono',fontSize:9,color:'var(--dim)'}}>NUEVAS REGLAS:</span>
+        {data.new_rules_suggested.map((r,i)=><span key={i} className="tag">{r.name||r.id}</span>)}
+      </div>}
+    </div>}
+    <div className="tab-row" style={{margin:'0 -24px',padding:'0 24px'}}>
+      {[['alerts',`Alertas (${alerts.length})`],['rules','Reglas'],['iocs','IoCs']].map(([id,label])=>
+        <div key={id} className={`tab ${tab===id?'active':''}`} onClick={()=>setTab(id)}>{label}</div>)}
+    </div>
+    <div style={{height:20}}/>
+    {tab==='alerts'&&<div className="feed">
+      {loading?<div className="loading">Ejecutando detectores</div>:
+       alerts.length===0?<div className="empty">Sin alertas generadas aún. Ejecuta un scan primero.</div>:
+       alerts.map(a=><div key={a.id} className={`alert-item ${a.severity}`}>
+        <span className={`alert-source ${a.source}`}>{SOURCE_LABELS[a.source]||a.source}</span>
+        <div className="alert-body">
+          <div className="alert-title">{a.title}</div>
+          <div className="alert-desc">{a.description}</div>
+          <div className="alert-meta">
+            <Badge val={a.severity}/>
+            {a.technique_ids?.slice(0,3).map(t=><span key={t} className="meta-tag">{t}</span>)}
+            <span className="meta-tag">conf: {(a.confidence*100).toFixed(0)}%</span>
+            <Conf v={a.confidence}/>
+            {a.asset_id&&a.asset_id!=='unknown'&&<span className="meta-tag">↪ {a.asset_id}</span>}
+            {a.requires_llm_review&&<span style={{fontFamily:'Share Tech Mono',fontSize:9,color:'var(--green)'}}>🤖 LLM</span>}
+          </div>
+          {a.llm_hypothesis&&<div style={{fontFamily:'Share Tech Mono',fontSize:10,color:'var(--green)',marginTop:6,padding:'4px 8px',background:'rgba(48,209,88,0.05)',borderRadius:3}}>{a.llm_hypothesis}</div>}
+        </div>
+        <span style={{fontFamily:'Share Tech Mono',fontSize:9,color:'var(--dim)',whiteSpace:'nowrap',marginTop:1}}>{a.detected_at?.substring(11,19)||''}</span>
+      </div>)}
+    </div>}
+    {tab==='rules'&&<div>
+      <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(280px,1fr))',gap:8}}>
+        {RULE_NAMES.map((name,i)=><div key={i} style={{background:'var(--surface)',border:'1px solid var(--border)',borderRadius:4,padding:10}}>
+          <div style={{color:'var(--cyan)',fontSize:9,letterSpacing:1,fontFamily:'Share Tech Mono'}}>RULE-{String(i+1).padStart(3,'0')}</div>
+          <div style={{color:'var(--text)',fontSize:11,marginTop:3,fontFamily:'var(--font-display)',fontWeight:600}}>{name}</div>
+          <div style={{color:'var(--dim)',fontSize:9,marginTop:4,fontFamily:'Share Tech Mono'}}>determinístico · regex</div>
+        </div>)}
+        {(data?.new_rules_suggested||[]).map((r,i)=><div key={`llm${i}`} style={{background:'var(--surface)',border:'1px solid rgba(48,209,88,0.25)',borderRadius:4,padding:10}}>
+          <div style={{color:'var(--green)',fontSize:9,letterSpacing:1,fontFamily:'Share Tech Mono'}}>{r.id||`RULE-LLM-${i}`}</div>
+          <div style={{color:'var(--text)',fontSize:11,marginTop:3,fontFamily:'var(--font-display)',fontWeight:600}}>{r.name||'LLM Rule'}</div>
+          <div style={{color:'var(--green)',fontSize:9,marginTop:4,fontFamily:'Share Tech Mono'}}>generada por RDT</div>
+        </div>)}
+      </div>
+    </div>}
+    {tab==='iocs'&&<div>
+      <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(280px,1fr))',gap:8}}>
+        {IOC_VALUES.map((ioc,i)=><div key={i} style={{background:'var(--surface)',border:'1px solid var(--border)',borderRadius:4,padding:10}}>
+          <div style={{color:'var(--orange)',fontSize:9,letterSpacing:1,fontFamily:'Share Tech Mono'}}>IOC-{String(i+1).padStart(3,'0')}</div>
+          <div style={{color:'var(--text)',fontSize:10,marginTop:3,wordBreak:'break-all',fontFamily:'Share Tech Mono'}}>{ioc}</div>
+          <div style={{color:'var(--dim)',fontSize:9,marginTop:4,fontFamily:'Share Tech Mono'}}>lab_internal · determinístico</div>
+        </div>)}
+      </div>
+    </div>}
+  </>;
+}
+
+// ─── Kill Chains ────────────────────────────────────────────────────────────────
+const TACTICS = [
+  'Reconnaissance','Initial Access','Execution','Persistence',
+  'Privilege Escalation','Defense Evasion','Credential Access',
+  'Discovery','Lateral Movement','Collection','Exfiltration','Impact',
+];
+const TECH_TACTIC = {
+  T1190:'Initial Access',T1078:'Initial Access',T1059:'Execution',
+  T1053:'Persistence',T1548:'Privilege Escalation',T1562:'Defense Evasion',
+  T1003:'Credential Access',T1082:'Discovery',T1005:'Collection',
+  T1021:'Lateral Movement',T1041:'Exfiltration',T1499:'Impact',
+};
+const CHAIN_STEPS = ['Initial Access','Execution','Persistence','Defense Evasion','Credential Access','Impact'];
+
+function Chains({summary}) {
+  const [data,setData]=useState(null);
+  const [expanded,setExpanded]=useState(null);
+  useEffect(()=>{API.get('chains').then(d=>setData(d||summary));},[]);
+  const src=data||summary||{};
+  const chains=src.chains_simulated||0;
+  const topFindings=src.top_findings||[];
+  const coveredTactics=new Set(topFindings.map(f=>TECH_TACTIC[f.technique_id]).filter(Boolean));
+  return <>
+    <div className="section-header">
+      <div>
+        <div className="section-title">Kill Chains</div>
+        <div className="section-sub">{chains} cadenas simuladas · profundidad máxima 6</div>
+      </div>
+    </div>
+    <div className="chart-panel" style={{marginBottom:20}}>
+      <div className="chart-title">ATT&CK Tactic Coverage</div>
+      <div style={{display:'flex',gap:6,flexWrap:'wrap',padding:'4px 0'}}>
+        {TACTICS.map(t=>{
+          const covered=coveredTactics.has(t);
+          return <div key={t} style={{
+            padding:'6px 12px',borderRadius:4,fontSize:10,fontFamily:'Share Tech Mono',letterSpacing:.5,
+            background:covered?'rgba(0,212,255,0.1)':'var(--surface2)',
+            border:`1px solid ${covered?'var(--cyan)':'var(--border)'}`,
+            color:covered?'var(--cyan)':'var(--dim)',
+          }}>{t}</div>;
+        })}
+      </div>
+    </div>
+    {topFindings.length===0
+      ? <div className="empty">Sin kill chains. Ejecuta un scan primero.</div>
+      : <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(340px,1fr))',gap:12}}>
+          {topFindings.slice(0,8).map((f,i)=>{
+            const open=expanded===i;
+            return <div key={f.id}
+              style={{background:'var(--surface)',border:'1px solid var(--border)',borderRadius:6,padding:14,cursor:'pointer'}}
+              onClick={()=>setExpanded(open?null:i)}>
+              <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:10}}>
+                <div>
+                  <div style={{fontFamily:'Share Tech Mono',fontSize:9,color:'var(--dim)'}}>CHAIN #{i+1}</div>
+                  <div style={{fontFamily:'var(--font-display)',fontWeight:700,fontSize:14,marginTop:2}}>{f.technique_id} on {f.asset}</div>
+                </div>
+                <Badge val={f.severity}/>
+              </div>
+              <div style={{borderLeft:'2px solid var(--border)',paddingLeft:12}}>
+                {(open?CHAIN_STEPS:CHAIN_STEPS.slice(0,3)).map((step,si)=>(
+                  <div key={si} style={{display:'flex',alignItems:'center',gap:8,marginBottom:6,position:'relative'}}>
+                    <div style={{width:8,height:8,borderRadius:'50%',position:'absolute',left:-17,
+                      background:si===0?'var(--cyan)':'var(--border)',border:'1px solid var(--cyan)'}}/>
+                    <span style={{fontFamily:'Share Tech Mono',fontSize:9,letterSpacing:.5,color:si===0?'var(--cyan)':'var(--dim)'}}>{step}</span>
+                    {si===0&&<span style={{fontFamily:'Share Tech Mono',fontSize:9,color:'var(--text)'}}>{f.technique_id}</span>}
+                  </div>
+                ))}
+                {!open&&<div style={{fontFamily:'Share Tech Mono',fontSize:9,color:'var(--dim)',marginTop:4}}>+ {CHAIN_STEPS.length-3} pasos más ▾</div>}
+              </div>
+              <div style={{marginTop:10,paddingTop:8,borderTop:'1px solid var(--border)',display:'flex',gap:8,alignItems:'center',flexWrap:'wrap'}}>
+                <span className="meta-tag">score: {f.score}</span>
+                <Badge val={f.detection_status}/>
+                {f.poc_id&&<span style={{fontFamily:'Share Tech Mono',fontSize:9,color:'var(--green)'}}>✓ PoC</span>}
+              </div>
+              {open&&<div style={{marginTop:12,padding:'10px',background:'var(--surface3)',borderRadius:4,fontFamily:'Share Tech Mono',fontSize:10,color:'var(--muted)',lineHeight:1.6}}>
+                <div><strong style={{color:'var(--cyan)'}}>Asset:</strong> {f.asset}</div>
+                <div><strong style={{color:'var(--cyan)'}}>Técnica:</strong> {f.technique_id}</div>
+                <div><strong style={{color:'var(--cyan)'}}>Tactic:</strong> {TECH_TACTIC[f.technique_id]||'—'}</div>
+                <div style={{marginTop:6,color:'var(--dim)'}}>{f.summary}</div>
+              </div>}
+            </div>;
+          })}
+        </div>
+    }
+  </>;
+}
+
+// ─── Remediation Board ─────────────────────────────────────────────────────────
+function Remediation() {
+  const [data,setData]=useState(null);
+  useEffect(()=>{API.get('remediation').then(setData);},[]);
+  if (!data) return <div className="loading">Cargando backlog</div>;
+  const {by_priority:bp={},summary:s={}} = data;
+  const sections=[
+    {key:'critical',label:'🔴 Crítico (SLA 1 día)',color:'var(--red)'},
+    {key:'high',label:'🟠 Alto (SLA 7 días)',color:'var(--orange)'},
+    {key:'medium',label:'🟡 Medio (SLA 30 días)',color:'var(--yellow)'},
+    {key:'low',label:'🟢 Bajo (SLA 90 días)',color:'var(--green)'},
+  ];
+  return <>
+    <div className="section-header">
+      <div>
+        <div className="section-title">Backlog de Remediación</div>
+        <div className="section-sub">{s.open||0} tickets abiertos · {JSON.stringify(s.by_owner||{})}</div>
+      </div>
+    </div>
+    {sections.map(({key,label,color})=>(bp[key]||[]).length>0&&<div key={key} className="rem-section">
+      <div className="rem-section-title" style={{color}}>{label}</div>
+      <div className="rem-cards">
+        {(bp[key]||[]).map(t=><div key={t.id} className="rem-card" style={{borderTop:`2px solid ${color}`}}>
+          <div className="rem-card-title">{t.title?.replace(/^\[.*?\]\s*/,'')}</div>
+          <div className="rem-card-meta">
+            <span className={`owner-badge ${t.owner_team}`}>{t.owner_team}</span>
+            <span className="sla-tag">SLA: {t.sla_days}d</span>
+            <Badge val={t.status||'open'} label={t.status||'open'}/>
+          </div>
+          {t.controls_to_apply?.length>0&&<>
+            <div style={{fontFamily:'Share Tech Mono',fontSize:9,color:'var(--dim)',letterSpacing:1,marginBottom:4}}>CONTROLES:</div>
+            <ul className="rem-card-controls">{t.controls_to_apply.slice(0,3).map((c,i)=><li key={i}>{c}</li>)}</ul>
+          </>}
+          {t.detection_rules_needed?.length>0&&<>
+            <div style={{fontFamily:'Share Tech Mono',fontSize:9,color:'var(--dim)',letterSpacing:1,margin:'8px 0 4px'}}>REGLAS DE DETECCIÓN:</div>
+            <ul className="rem-card-controls">{t.detection_rules_needed.slice(0,2).map((r,i)=><li key={i} style={{color:r.startsWith('PRIORITY')?'var(--red)':'var(--dim)'}}>{r}</li>)}</ul>
+          </>}
+        </div>)}
+      </div>
+    </div>)}
+  </>;
+}
+
+// ─── Evidence Browser ──────────────────────────────────────────────────────────
+function Evidence() {
+  const [data,setData]=useState(null);
+  const [open,setOpen]=useState(null);
+  const [typeFilter,setTypeFilter]=useState('');
+  useEffect(()=>{API.get(`evidence?limit=30&evidence_type=${typeFilter}`).then(setData);},[typeFilter]);
+  const records=data?.records||[];
+  const summary=data?.summary||{};
+  return <>
+    <div className="section-header">
+      <div>
+        <div className="section-title">Evidence Engine</div>
+        <div className="section-sub">{summary.total_records||0} registros · SHA-256 + chain of custody</div>
+      </div>
+      <div className="filters">
+        <select className="filter-select" value={typeFilter} onChange={e=>{setTypeFilter(e.target.value);setData(null)}}>
+          <option value="">All Types</option>
+          {['stdout','log','poc','chain_step','evasion'].map(t=><option key={t} value={t}>{t}</option>)}
+        </select>
+      </div>
+    </div>
+    <div className="cards-grid" style={{gridTemplateColumns:'repeat(auto-fill,minmax(160px,1fr))'}}>
+      {Object.entries(summary.by_type||{}).map(([k,v])=><div key={k} className="card" style={{'--card-accent':'var(--cyan)'}}>
+        <div className="card-label">{k}</div>
+        <div className="card-value" style={{fontSize:28}}>{v}</div>
+      </div>)}
+      {summary.assets_covered&&<div className="card" style={{'--card-accent':'var(--green)'}}>
+        <div className="card-label">Assets</div>
+        <div className="card-value" style={{fontSize:28}}>{summary.assets_covered}</div>
+      </div>}
+      {summary.techniques_covered&&<div className="card" style={{'--card-accent':'var(--purple)'}}>
+        <div className="card-label">Técnicas</div>
+        <div className="card-value" style={{fontSize:28}}>{summary.techniques_covered}</div>
+      </div>}
+    </div>
+    {records.length===0?<div className="empty">Sin registros de evidencia. Ejecuta un scan primero.</div>:
+     records.map(r=><div key={r.id} className="evd-item" onClick={()=>setOpen(open===r.id?null:r.id)}>
+      <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:6}}>
+        <span className="evd-id">{r.id}</span>
+        <span className="evd-type">{r.evidence_type}</span>
+        <span style={{fontFamily:'Share Tech Mono',fontSize:9,color:'var(--dim)'}}>asset: {r.asset_id}</span>
+        <span style={{fontFamily:'Share Tech Mono',fontSize:9,color:'var(--dim)'}}>tech: {r.technique_id}</span>
+        <span style={{marginLeft:'auto',fontFamily:'Share Tech Mono',fontSize:9,color:'var(--dim)'}}>SHA: {r.hash_sha256?.substring(0,12)}…</span>
+      </div>
+      <div style={{fontFamily:'Share Tech Mono',fontSize:9,color:'var(--dim)'}}>
+        collected by: {r.collector} · {r.collected_at?.substring(0,19)||''}
+      </div>
+      {open===r.id&&<div className="evd-detail">
+        {r.chain_of_custody?.map((c,i)=><div key={i} style={{color:'var(--green)',marginBottom:2}}>▸ {c}</div>)}
+        <div style={{marginTop:8,borderTop:'1px solid var(--border)',paddingTop:8}}>
+          {typeof r.content==='string'?r.content.substring(0,500):JSON.stringify(r.content).substring(0,500)}
+        </div>
+      </div>}
+    </div>)}
+  </>;
+}
+
+// ─── App ────────────────────────────────────────────────────────────────────────
+const PAGES = [
+  {id:'overview',icon:'◈',label:'Overview'},
+  {id:'findings',icon:'◉',label:'Findings'},
+  {id:'detectors',icon:'⚡',label:'Detectores'},
+  {id:'chains',icon:'⛓',label:'Kill Chains'},
+  {id:'remediation',icon:'🛠',label:'Remediación'},
+  {id:'evidence',icon:'📁',label:'Evidencia'},
+];
+
+function App() {
+  const [page,setPage]=useState('overview');
+  const [summary,setSummary]=useState(null);
+  const [status,setStatus]=useState(null);
+  const [metrics,setMetrics]=useState(null);
+  const [scanning,setScanning]=useState(false);
+  const poll=useRef(null);
+
+  useEffect(()=>{
+    Promise.all([API.get('summary'),API.get('status'),API.get('metrics')]).then(([s,st,m])=>{
+      setSummary(s);setStatus(st);setMetrics(m);
+    });
+    poll.current=setInterval(()=>{
+      API.get('status').then(st=>{
+        setStatus(st);
+        if(st?.status==='idle'&&scanning){setScanning(false);API.get('summary').then(setSummary);}
+      });
+    },5000);
+    return ()=>clearInterval(poll.current);
+  },[]);
+
+  const runScan=async()=>{
+    setScanning(true);
+    await API.post('run');
+  };
+
+  const pageLabels={overview:'Resumen Ejecutivo',findings:'Hallazgos',detectors:'Detection Engine',chains:'Kill Chains',remediation:'Remediación',evidence:'Evidencia'};
+
+  return <div className="app">
+    <div className="sidebar">
+      <div className="sidebar-logo">
+        <div className="logo-title">AI CYBER RANGE</div>
+        <div className="logo-sub">OFENSIVA CONTROLADA · IA</div>
+      </div>
+      <div className="nav-section">Análisis</div>
+      {PAGES.slice(0,2).map(p=><div key={p.id} className={`nav-item ${page===p.id?'active':''}`} onClick={()=>setPage(p.id)}>
+        <span className="nav-icon">{p.icon}</span>{p.label}
+      </div>)}
+      <div className="nav-section">Detección</div>
+      {PAGES.slice(2,4).map(p=><div key={p.id} className={`nav-item ${page===p.id?'active':''}`} onClick={()=>setPage(p.id)}>
+        <span className="nav-icon">{p.icon}</span>{p.label}
+      </div>)}
+      <div className="nav-section">Remediación</div>
+      {PAGES.slice(4).map(p=><div key={p.id} className={`nav-item ${page===p.id?'active':''}`} onClick={()=>setPage(p.id)}>
+        <span className="nav-icon">{p.icon}</span>{p.label}
+      </div>)}
+      <div className="sidebar-footer">
+        <div>MITRE ATT&CK</div>
+        <div style={{marginTop:2}}>v2.0 · {new Date().toLocaleDateString()}</div>
+      </div>
+    </div>
+    <div className="main">
+      <div className="header">
+        <div className="header-title">{pageLabels[page]}</div>
+        <div className="status-pill idle" style={scanning?{color:'var(--yellow)',borderColor:'var(--yellow)',background:'var(--yellow-dim)'}:{}}>
+          <div className={`pulse ${scanning?'running':''}`}/>
+          {scanning?'SCANNING…':'IDLE'}
+        </div>
+        <div className="last-scan">{status?.last_scan_at?.substring(0,19).replace('T',' ')||'—'}</div>
+        <button className="run-btn" onClick={runScan} disabled={scanning}>{scanning?'RUNNING…':'▶ RUN SCAN'}</button>
+      </div>
+      <div className="content">
+        {page==='overview'&&<Overview summary={summary} metrics={metrics}/>}
+        {page==='findings'&&<Findings/>}
+        {page==='detectors'&&<Detectors/>}
+        {page==='chains'&&<Chains summary={summary}/>}
+        {page==='remediation'&&<Remediation/>}
+        {page==='evidence'&&<Evidence/>}
+      </div>
+    </div>
+  </div>;
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script>
+</body>
+</html>

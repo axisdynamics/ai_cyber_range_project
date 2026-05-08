@@ -1,0 +1,3 @@
+{"ts":"2026-05-08T10:00:00Z","source":"c_lab_service","event":"input_validation_warning","asset":"local_c_lab_service","detected":true,"severity":"medium"}
+{"ts":"2026-05-08T10:01:00Z","source":"edr_fixture","event":"unexpected_process_pattern_simulated","asset":"local_c_lab_service","detected":true,"severity":"medium"}
+{"ts":"2026-05-08T10:02:00Z","source":"siem_fixture","event":"synthetic_egress_denied","asset":"fixtures.synthetic_logs","detected":true,"severity":"low"}

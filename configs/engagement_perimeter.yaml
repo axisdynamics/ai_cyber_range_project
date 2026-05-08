@@ -1,0 +1,48 @@
+# engagement_perimeter.yaml
+# Defines the authorized attack surface for the controlled offensive program.
+# ALL targets in this file require explicit prior authorization.
+# Modify only with governance approval.
+
+engagement_id: "ENG-001"
+authorized_by: "governance_agent"
+version: "1.0"
+
+# Assets explicitly in scope for offensive testing
+authorized_asset_ids:
+  - "local_c_lab_service"
+  - "fixtures.synthetic_logs"
+  - "fixtures.asset_graph"
+  - "api_gateway_demo"
+  - "pipeline_demo"
+  - "cloud_storage_demo"
+  - "iam_role_demo"
+  - "secrets_store_demo"
+
+# ATT&CK techniques authorized for simulation
+authorized_technique_ids:
+  - "T1190"   # Initial Access: Exploit Public-Facing Application
+  - "T1059"   # Execution: Command and Scripting Interpreter
+  - "T1053"   # Persistence: Scheduled Task/Job
+  - "T1078"   # Initial Access: Valid Accounts
+  - "T1548"   # Privilege Escalation: Abuse Elevation Control
+  - "T1562"   # Defense Evasion: Impair Defenses
+  - "T1003"   # Credential Access: OS Credential Dumping
+  - "T1082"   # Discovery: System Information Discovery
+  - "T1021"   # Lateral Movement: Remote Services
+  - "T1005"   # Collection: Data from Local System
+  - "T1041"   # Exfiltration: Over C2 Channel
+  - "T1499"   # Impact: Endpoint Denial of Service
+
+# Kill chain simulation settings
+max_chain_depth: 6
+allow_evasion_tests: true
+allow_chain_simulation: true
+
+# Explicitly disallowed actions (never permitted regardless of other settings)
+disallowed_actions:
+  - "persistence_on_real_systems"
+  - "credential_collection_against_real_users"
+  - "destructive_actions_on_real_data"
+  - "external_network_exfiltration"
+  - "public_ip_targets"
+  - "lateral_movement_outside_lab"
