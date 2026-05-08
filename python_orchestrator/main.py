@@ -118,8 +118,8 @@ def generate_markdown_report(
     lines = [
         "# AI Cyber Range — Reporte de Ofensiva Controlada",
         "",
-        f"**Programa:** {config['program']['name']}",
-        f"**Modo:** {config['program']['mode']}",
+        f"**Programa:** {config.get('program',{}).get('name','AI Cyber Range')}",
+        f"**Modo:** {config.get('program',{}).get('mode','local_lab_only')}",
         f"**Run ID:** {offensive_result.run_id}",
         f"**Engagement:** {offensive_result.engagement_id}",
         f"**Inicio:** {offensive_result.started_at}",
@@ -387,7 +387,7 @@ def main() -> None:
 
     evidence_summary = evidence_eng.build_evidence_summary()
     report_json = {
-        "program":         config["program"],
+        "program":         config.get("program", {"name":"AI Cyber Range","version":"2.0","mode":"local_lab_only"}),
         "sovereignty":     config["sovereignty"],
         "run_id":          offensive_result.run_id,
         "engagement_id":   offensive_result.engagement_id,

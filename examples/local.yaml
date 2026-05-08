@@ -38,3 +38,38 @@ api_key_enabled: false
 cors_allowlist:
   - "http://localhost:8080"
   - "http://127.0.0.1:8080"
+
+# Legacy compatibility fields (required by python_orchestrator/main.py)
+program:
+  name: "AI Cyber Range — Local Lab"
+  version: "2.0"
+  mode: "local_lab_only"
+  allow_external_targets: false
+  continuous_mode: false
+  cicd_trigger_enabled: false
+
+sovereignty:
+  model_policy: "local_or_enterprise_private_only"
+  data_residency: "customer_controlled"
+  audit_required: true
+  evidence_retention_days: 30
+
+rules_of_engagement:
+  authorized_assets_only: true
+  allowed_targets:
+    - "iam_role_demo"
+    - "api_gateway_demo"
+    - "pipeline_demo"
+    - "secrets_store_demo"
+    - "cloud_storage_demo"
+    - "local_c_lab_service"
+    - "fixtures.synthetic_logs"
+    - "fixtures.asset_graph"
+  blocked_techniques:
+    - "T1485"
+    - "T1561"
+    - "T1529"
+
+llm_config:
+  provider: "deterministic"
+  mode: "deterministic"
