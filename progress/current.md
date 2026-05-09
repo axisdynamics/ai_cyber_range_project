@@ -1,9 +1,11 @@
-# progress/current.md — Sesion activa
+# progress/current.md — Sesión activa
 
 ## Estado: IDLE
 
-Ultima sesion completada: 2026-05-08T17:30:00Z
-Integraciones completadas: v3 (web+detectores), v4 (harness), v5 (OpenMythos+C/Rust)
-Siguiente escenario pendiente: id=4 - lateral_movement_api_gateway_t1021
+Última sesión completada: 2026-05-09T00:06:00Z
+Integraciones completadas: Hermes multi-agente, CLI completo, tests 115/85%, beta productivo
 
-Sin sesion activa. Ejecuta ./init.sh y selecciona un escenario.
+Sin sesión activa. Ejecuta:
+  cyber-range status
+  cyber-range run             # estándar
+  cyber-range run --mode agent  # Hermes

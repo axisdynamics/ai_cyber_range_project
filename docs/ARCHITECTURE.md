@@ -1,325 +1,210 @@
 # Arquitectura — AI Cyber Range
 
-> Versión 5.0 · Última actualización: 2026-05-08
+> v2.0-beta · Última actualización: 2026-05-08
 
 ---
 
-## Visión general
-
-El Cyber Range implementa cinco capas cohesivas. Cada capa depende de la
-anterior y expone una interfaz limpia hacia arriba.
+## Las 6 capas
 
 ```
- ┌─────────────────────────────────────────────────────────────────┐
- │  HARNESS (orquestación multi-agente)                            │
- │  Líder → Implementer (red_team) → Reviewer (blue_team)         │
- ├─────────────────────────────────────────────────────────────────┤
- │  PIPELINE OFENSIVO (Python agentivo)                            │
- │  Governance → OffensiveHarness → Chains → Evasion → PoC        │
- ├─────────────────────────────────────────────────────────────────┤
- │  DETECCIÓN HÍBRIDA (determinístico + RDT)                       │
- │  Rule + Sigma + IoC + Anomaly → HybridDetector → MythosReasoner │
- ├─────────────────────────────────────────────────────────────────┤
- │  CAPA NATIVA (C + Rust)                                         │
- │  lab_service (ataque) · evidence_validator (auditoría)          │
- ├─────────────────────────────────────────────────────────────────┤
- │  WEB (React SPA + FastAPI)                                      │
- │  6 páginas · 10 endpoints REST · polling en tiempo real        │
- └─────────────────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────────────┐
+│  C1 · HARNESS                                                        │
+│  CLAUDE.md · AGENTS.md · CHECKPOINTS.md                             │
+│  engagement_backlog.json · progress/ · .claude/agents/              │
+├──────────────────────────────────────────────────────────────────────┤
+│  C2 · src/cyber_range/ (paquete Python productivo)                   │
+│  cli/ · config/ · policy/ · pipeline/ · scoring/                    │
+│  evidence/ · reporting/ · logging/ · api/                           │
+├──────────────────────────────────────────────────────────────────────┤
+│  C3 · HERMES MULTI-AGENTE                                            │
+│  HermesOrchestrator → 9 agentes paralelos → AgentMemory (SQLite)    │
+│  GapAnalysisAgent → prioriza por historial de evasión               │
+├──────────────────────────────────────────────────────────────────────┤
+│  C4 · PIPELINE OFENSIVO (python_orchestrator/)                       │
+│  Governance → OffensiveHarness → Chains → Evasion → PoC → Evidence  │
+├──────────────────────────────────────────────────────────────────────┤
+│  C5 · DETECCIÓN HÍBRIDA + RDT (OpenMythos)                          │
+│  RuleEngine · Sigma · IoC · Anomaly → HybridDetector → Mythos        │
+├──────────────────────────────────────────────────────────────────────┤
+│  C6 · NATIVO + WEB                                                   │
+│  Rust: lab_service + evidence_validator · React + FastAPI            │
+└──────────────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## Capa 1 — Harness
+## C2 — src/cyber_range/ (paquete productivo)
 
-Inspirado en Harness Engineering (github.com/betta-tech/ejemplo-harness-subagentes).
+`pip install -e .` → entrypoint `cyber-range`.
 
-### Principios
-- **El repositorio ES el sistema.** Todo el estado vive en disco, no en chat.
-- **Una feature (escenario) a la vez.** `init.sh` rechaza >1 `in_progress`.
-- **Anti-hallucination.** Un finding sin evidencia en disco con SHA-256 no existe.
-- **Nadie se autoaprueba.** El red_team_agent no valida su propio trabajo.
-- **Divulgación progresiva.** `AGENTS.md` es un mapa, no una biblia.
+### config/schema.py — Pydantic v2
 
-### Archivos del arnés
+Valida toda config antes de ejecutar. Fail-closed.  
+`allow_external_targets=true` → rechazado siempre.  
+`T1485, T1561, T1529` → siempre en `blocked_techniques`.
 
-| Archivo | Rol |
-|---------|-----|
-| `CLAUDE.md` | Fuerza a Claude Code a actuar como `cyber_leader` |
-| `AGENTS.md` | Mapa de navegación para cualquier agente |
-| `CHECKPOINTS.md` | Criterios C1-C6 de "range sano" |
-| `engagement_backlog.json` | Backlog de escenarios (pending/in_progress/done) |
-| `progress/current.md` | Estado de la sesión activa (vivo) |
-| `progress/history.md` | Bitácora append-only entre sesiones |
-| `.claude/agents/cyber_leader.md` | Planifica, no ejecuta |
-| `.claude/agents/red_team_agent.md` | Ejecuta UN escenario, escribe a disco |
-| `.claude/agents/blue_team_agent.md` | Valida SHA-256, no se autoaprueba |
-
-### Flujo de un escenario
-
-```
-cyber_leader
-    │
-    ├── 1. Lee engagement_backlog.json → elige scenario pending (id mínimo)
-    ├── 2. Actualiza progress/current.md
-    ├── 3. → red_team_agent
-    │         ejecuta via HarnessOrchestrator
-    │         escribe progress/impl_<id>.md
-    │         genera artifacts/evidence/EVD-*.json
-    │         devuelve: "ver progress/impl_<id>.md"
-    │
-    ├── 4. → blue_team_agent
-    │         lee impl_<id>.md
-    │         verifica SHA-256 de cada evidencia
-    │         escribe progress/review_<id>.md
-    │         devuelve: "APPROVED / REJECTED"
-    │
-    └── 5. Si APPROVED:
-              engagement_backlog → status: done
-              progress/current.md → plantilla vacía
-              progress/history.md → append sesión
-```
-
-### HarnessOrchestrator (Python)
+### policy/enforcer.py — Fail-closed
 
 ```python
-# python_orchestrator/harness/harness_orchestrator.py
-orch = HarnessOrchestrator()
-result = orch.run_single_scenario(scenario_id=4)
-# result.verdict: APPROVED | REJECTED | BLOCKED
-# result.impl_ref: "progress/impl_scenario_4.md"
-# result.review_ref: "progress/review_scenario_4.md"
+enforcer.check_technique("T1485")           # BLOCKED (hardcoded)
+enforcer.check_asset("8.8.8.8")             # BLOCKED (external IP)
+enforcer.check_scenario("iam_role", "T1078") # asset + technique juntos
+```
+
+### scoring/engine.py — Determinístico, siempre [0,100]
+
+```python
+coverage_pct(finding_techs, scope)     # nunca > 100%
+detection_gap_pct(findings)            # fracción con status=gap
+risk_score(severity, criticality, ...) # 0-100
+confidence_score(repro, evidence, ver) # 0.0-1.0
+```
+
+### evidence/verifier.py — SHA-256 + tamper detection
+
+Estados: `valid | missing | modified | unreferenced | no_hash`.  
+`report.passed` → True solo si missing=0 AND modified=0 AND no_hash=0.
+
+### reporting/generator.py — Schema v1 estable
+
+```json
+{
+  "schema_version": "1.0",
+  "executive_summary": {
+    "coverage_pct": 97.2,
+    "detection_gap_pct": 65.8
+  },
+  "findings": [...],
+  "limitations": [...]
+}
+```
+
+### api/app.py — FastAPI
+
+- Auth: `X-API-Key` header (configurable)
+- CORS: allowlist explícita, nunca `*`
+- Errores: `{"error": {"code": "...", "message": "...", "details": {}}}`
+
+---
+
+## C3 — Hermes Multi-Agente
+
+```
+HermesOrchestrator
+├── AgentMemory (SQLite: artifacts/agent_memory.db)
+│   ├── get_persistent_gaps(min_occurrences=2)
+│   ├── get_priority_techniques(scope)  ← gap_rate × avg_score
+│   └── get_technique_learning(tech_id)
+│
+├── GapAnalysisAgent — prioriza técnicas por historial de evasión
+│
+└── ThreadPoolExecutor (max_workers=4):
+    ├── InitialAccessAgent  (T1190, T1078, T1133)
+    ├── ExecutionAgent      (T1059, T1053, T1203)
+    ├── PrivilegeAgent      (T1548, T1055, T1134)
+    ├── EvasionAgent        (T1562, T1078, T1027)
+    ├── CredentialAgent     (T1003, T1552, T1558)
+    ├── DiscoveryAgent      (T1082, T1046, T1049)
+    ├── LateralAgent        (T1021, T1091, T1550)
+    ├── CollectionAgent     (T1005, T1041, T1074)
+    └── ImpactAgent         (T1499, T1486, T1490)
+```
+
+**Flujo por agente:**
+```
+PolicyEnforcer.check_scenario()  ← SIEMPRE PRIMERO
+    BLOCKED → skip + log
+    ALLOWED → RedTeamAgent.run_scenario() → AgentResult
+```
+
+**Memoria cross-run:**
+```python
+memory.remember_run(summary)           # métricas del run
+memory.remember_findings(run_id, fs)   # actualiza gaps y learning
+priority = memory.get_priority_techniques(scope)
+# → técnicas con mayor gap_rate y avg_score primero
 ```
 
 ---
 
-## Capa 2 — Pipeline ofensivo
-
-### Agentes Python
-
-| Agente | Función |
-|--------|---------|
-| `GovernanceAgent` | Autorización + soberanía + reglas de engagement |
-| `OffensiveHarness` | Coordinador central del ciclo ofensivo |
-| `AttackChainSimulator` | Kill chains multi-paso (orden táctico MITRE, depth=6) |
-| `EvasionTester` | Tests de evasión por control |
-| `PoCBuilder` | PoCs reproducibles con IoCs + SHA-256 |
-| `RedTeamAgent` | Ejecución sobre fixtures locales |
-| `DetectionAgent` | Validación de telemetría blue team |
-| `ReviewerAgent` | Quality gate + deduplicación |
-| `RiskScoringEngine` | Severidad × criticidad × gap × reproducibilidad |
-
-### Ciclo ofensivo
+## C4 — Pipeline ofensivo
 
 ```
 GovernanceAgent.authorize()
-    │
     └── OffensiveHarness.run()
-            ├── para cada (asset × técnica) en perimeter:
-            │       AttackChainSimulator.simulate()   → kill chain
-            │       EvasionTester.test()              → evasion results
-            │       PoCBuilder.build()                → PoC + IoCs
-            │       EvidenceEngine.collect()          → EVD-*.json (SHA-256)
-            │
-            ├── ReviewerAgent.review()               → dedup + quality gate
-            ├── RiskScoringEngine.score()             → priorización
-            └── RemediationEngine.generate_backlog() → tickets con SLA
-```
-
-### Modelos de datos clave
-
-```python
-# python_orchestrator/core/models.py
-@dataclass
-class Finding:
-    id: str
-    asset: str
-    technique_id: str
-    severity: str          # critical | high | medium | low
-    detection_status: str  # gap | detected | partial
-    score: float           # 0-100
-    reproducible: bool
-    evidence_path: str
-    poc_id: Optional[str]
-
-@dataclass
-class Evidence:
-    id: str
-    asset_id: str
-    technique_id: str
-    evidence_type: str
-    hash_sha256: str       # 64-char hex, OBLIGATORIO
-    chain_of_custody: List[str]
-    content: Any
+            ├── [asset × technique]: RedTeamAgent.run_scenario()
+            │   ├── AttackChainSimulator  → kill chains (depth=6)
+            │   ├── EvasionTester        → control bypass tests
+            │   ├── PoCBuilder           → PoCs + SHA-256
+            │   └── EvidenceEngine       → EVD-*.json
+            ├── ReviewerAgent            → dedup + quality gate
+            ├── RiskScoringEngine        → priorización
+            └── RemediationEngine        → tickets con SLA
 ```
 
 ---
 
-## Capa 3 — Detección híbrida
-
-### Motores determinísticos
+## C5 — Detección híbrida + RDT
 
 ```
-RuleEngine         12 reglas YARA-like
-                   Cada regla: patterns (AND) + any_of (OR) + fields
-                   Completamente determinístico — mismo input = mismo output
-
-SigmaCorrelator    7 reglas correlación multi-evento
-                   Modos: count | sequence | threshold
-                   Ventanas temporales configurables
-
-IoCMatcher         12 IoCs con tipos: string | domain | hash | filepath | process
-                   Wildcard support para dominios (*.attacker.invalid)
-
-AnomalyDetector    Z-score sobre métricas rolling
-                   Algoritmo de Welford (online, O(1) por evento)
-                   Mínimo 5 muestras antes de activar alertas
-```
-
-### RecurrentDepthReasoner (OpenMythos RDT)
-
-Implementa la ecuación de actualización del Recurrent-Depth Transformer:
-
-```
-h_{t+1} = A·h_t + B·e + Transformer(h_t, e)
-
-Donde:
-  h_t  = hipótesis de amenaza actual (JSON)
-  e    = evidencia original (inyectada en CADA loop — previene drift)
-  A    = matriz de retención → implementada como RETENTION_DECAY=0.65
-  B    = inyección → constante 1.0 (evidencia siempre presente)
-  Transformer(h_t, e) = llamada a Anthropic API con experto + profundidad
-
-Halting (ACT):
-  ρ̂ = 1 - Jaccard(h_t, h_{t+1})
-  Si ρ̂ < 0.28 → convergido, detener
-
-MoE routing:
-  8 expertos enrutados (uno por clúster de táctica ATT&CK)
-  1 experto compartido (siempre activo: General Security Analyst)
-  Loop 0 → experto compartido (reconocimiento amplio)
-  Loop 1+ → especialista según technique_id (análisis profundo)
-
-Loop-index embedding:
-  Fase 0: reconocimiento general
-  Fase 1: análisis técnico profundo
-  Fase 2: refinamiento de hipótesis
-  Fase 3+: convergencia y eliminación de falsos positivos
-```
-
-### Pipeline de detección completo
-
-```python
-from python_orchestrator.detectors.hybrid_detector import HybridDetector
-
-detector = HybridDetector()
-result = detector.analyze(findings, evidence_records)
-
-# result.all_alerts       → List[DetectionAlert] (ordenadas por severidad × confianza)
-# result.engine_stats     → {rule_engine_rules, sigma_rules, ioc_count,
-#                            mythos_available, mythos_last_loops,
-#                            mythos_spectral_profile, ...}
-# result.new_rules_suggested → reglas generadas por LLM → registradas en RuleEngine
+Findings
+    ├── RuleEngine         12 reglas determinísticas
+    ├── SigmaCorrelator    7 reglas correlación multi-evento
+    ├── IoCMatcher         12 IoCs
+    └── AnomalyDetector    Z-score Welford
+         └── HybridDetector
+                  ├── Alta confianza → alert inmediata
+                  └── Novel/baja → RecurrentDepthReasoner
+                            h_{t+1} = A·h_t + B·e + Transformer(h_t,e)
+                            MoERouter: 8 expertos + 1 compartido
+                            ACT halt: ρ̂ < 0.28
 ```
 
 ---
 
-## Capa 4 — C y Rust
+## C6 — Capa nativa + Web
 
-### Rust lab_service (`rust_validator/src/lab_service.rs`)
+### Rust (`rust_validator/`)
 
-**Sustitución completa del C service en Rust.**
-Misma interfaz CLI y exit codes. Seguro en memoria por diseño. macOS + Linux + Windows.
+| Binario | Comandos | Técnicas |
+|---------|---------|---------|
+| `lab_service` | add, echo, auth, exec, env, privesc, persist, lateral, collect, exfil, dos, alloc, selftest, audit | T1190, T1059, T1078, T1548, T1082, T1003, T1021, T1005, T1041, T1499, T1053 |
+| `evidence_validator` | validate, audit-evidence, attack-surface, entropy, sockets... | — |
 
-| Comando | Técnica | Superficie |
-|---------|---------|------------|
-| `add <text>` | T1190 | Bounds check — Rust enforces sin overflow real |
-| `echo <input>` | T1190 | Format string detection (`%` chars) |
-| `auth <u> <p>` | T1078, T1190 | Constant-time compare + timing simulation |
-| `exec <cmd>` | T1059 | Shell metacharacter injection detection |
-| `env` | T1082 | /etc/os-release, PID, env vars, Linux caps |
-| `privesc` | T1548 | SUID scan (`PermissionsExt`), capabilities |
-| `persist` | T1053 | Crontab paths + macOS LaunchAgents |
-| `lateral <target>` | T1021 | Sovereignty check + pivot marker |
-| `collect [path]` | T1005, T1003 | `std::fs::metadata` — sin stat() |
-| `exfil <data>` | T1041 | DNS + C2 POST marker sintético |
-| `dos <count>` | T1499 | CPU burn acotado + `std::hint::spin_loop` |
-| `alloc <size>` | T1190 | Integer overflow bounds check con Vec |
-| `selftest` | todos | 15 casos, `passed=15 failed=0` |
-| `audit` | T1082+ | Surface scan completo |
+Compilación: `cargo build --release --manifest-path rust_validator/Cargo.toml`.
 
-**Por qué Rust en lugar de C:**
-- `std::fs::metadata` reemplaza `stat()` — funciona en macOS Y Linux sin `#ifdef`
-- Memory safety por diseño — imposible buffer overflow real (solo simulado)
-- `cargo build --release` funciona igual en macOS y Linux sin flags de plataforma
-- `ct_eq()` implementado en safe Rust sin `volatile` ni `ct_memcmp`
+### Web
 
-**Compilar:**
-```bash
-cargo build --release --manifest-path rust_validator/Cargo.toml
-# Produce dos binarios:
-# rust_validator/target/release/lab_service         ← superficie de ataque
-# rust_validator/target/release/evidence_validator  ← auditoría
+React (6 páginas) + FastAPI. `dist/` pre-compilado incluido en el repositorio.
+
+---
+
+## Artefactos por run
+
+```
+artifacts/runs/<RUN_ID>/
+    summary.json          ← métricas del run
+    findings.json         ← findings con scores [0,100]
+    evidence/             ← copias EVD-*.json
+    report.md + report.json
+    chain_of_custody.json
+    logs.jsonl            ← JSONL sin secretos
+    agent_results.json    ← (modo agent) métricas por agente
 ```
 
-### Rust validator (`rust_validator/src/main.rs`)
-
-Audit binary de 793 líneas con 9 comandos. Es la fuente de verdad del `blue_team_agent`.
-
-| Comando | Función |
-|---------|---------|
-| `validate <finding.json>` | 8 checks: id, técnica, severidad, evidencia, SHA-256, chain |
-| `validate-batch <dir>` | Valida todos los findings de un directorio |
-| `audit-evidence <dir>` | SHA-256 chain audit sobre todos los EVD-*.json |
-| `attack-surface` | PIDs, UIDs, FDs, memory maps, sockets, process tree |
-| `entropy <file>` | Shannon entropy con ventanas de 512 bytes |
-| `capabilities` | CapPrm, CapEff, CapBnd desde /proc/self/status |
-| `sockets` | /proc/net/tcp,tcp6,udp,udp6 con decode de estado |
-| `process-tree` | Cadena PPID hasta init |
-| `audit-report [out.json]` | Reporte JSON completo: health=HEALTHY/DEGRADED/CRITICAL |
-
 ---
 
-## Capa 5 — Web
+## Tests — 115 passing, 85% cobertura core
 
-### FastAPI (`web/api/main.py`)
-
-10 endpoints REST:
-
-| Método | Ruta | Descripción |
-|--------|------|-------------|
-| GET | `/api/status` | Estado del sistema + último scan |
-| GET | `/api/summary` | Métricas ejecutivas |
-| GET | `/api/findings` | Findings con filtros (severity, asset, detection_status) |
-| GET | `/api/remediation` | Backlog agrupado por prioridad + owner |
-| GET | `/api/chains` | Kill chains simuladas |
-| GET | `/api/evidence` | Registros de evidencia |
-| GET | `/api/detections` | Ejecuta HybridDetector, devuelve todas las alertas |
-| GET | `/api/metrics` | Cobertura, gap, distribución de scores |
-| POST | `/api/run` | Lanza un nuevo scan en background |
-| GET | `/` | Sirve el dashboard React |
-
-### Dashboard React
-
-6 páginas en el dashboard (Rajdhani + Share Tech Mono, tema oscuro ops-center):
-
-- **Overview** — 8 metric cards + PieChart severidades + BarChart scores + BarChart tácticas
-- **Findings** — tabla sortable/filtrable con severity badges y score bars
-- **Detectores** — stats de motores + feed de alertas (RULE/SIGMA/IOC/ANOMALY/LLM)
-             + browser de reglas + browser de IoCs + análisis LLM (MythosReasoner)
-- **Kill Chains** — cobertura de tácticas ATT&CK + tarjetas de cadenas con timeline
-- **Remediación** — backlog agrupado por SLA con controles y reglas necesarias
-- **Evidencia** — browser con chain-of-custody expandible + SHA-256
-
----
-
-## Convenciones de código
-
-Ver `docs/conventions.md` para naming, error handling y formato de artefactos.
-
-## Verificación
-
-Ver `docs/verification.md` para cómo demostrar que un cambio funciona.
+| Archivo | Tests | Cobertura |
+|---------|-------|-----------|
+| `test_scoring.py` | 28 | 100% |
+| `test_config.py` | 13 | 95% |
+| `test_logging.py` | 15 | 95% |
+| `test_policy.py` | 17 | 94% |
+| `test_reporting.py` | 13 | 76% |
+| `test_evidence.py` | 7 | 69% |
+| `test_memory.py` | 10 | — |
 
 ---
 

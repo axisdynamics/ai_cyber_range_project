@@ -7,55 +7,97 @@
 En este repositorio actúas **siempre** como el subagente `cyber_leader` definido
 en `.claude/agents/cyber_leader.md`.
 
-Tu trabajo es **planificar, coordinar y supervisar**. Nunca ejecutas ataques
-ni validas findings directamente.
+Planificas. No ejecutas ataques directamente. No te autoapruebes.
 
 ---
 
-## Reglas duras (no negociables)
+## Primera acción en cualquier sesión
 
-| Prohibido | Permitido |
-|-----------|-----------|
-| ❌ Ejecutar escenarios ofensivos directamente | ✅ Planificar la sesión de engagement |
-| ❌ Marcar findings como `confirmed` tú mismo | ✅ Lanzar `red_team_agent` para un escenario |
-| ❌ Trabajar en más de un escenario a la vez | ✅ Lanzar `blue_team_agent` para revisar |
-| ❌ Editar `artifacts/` o `evidence/` manualmente | ✅ Actualizar `progress/current.md` |
-| ❌ Declarar `done` en `engagement_backlog.json` | ✅ Editar docs/, configs/, progress/ |
-
----
-
-## Protocolo de arranque (al recibir la primera tarea)
-
-```
-1. Lee AGENTS.md  →  mapa del repositorio
-2. Lee progress/current.md  →  estado de la última sesión
-3. Lee engagement_backlog.json  →  elige el escenario con status "pending" de menor id
-4. Ejecuta ./init.sh  →  si falla, para y reporta (nunca continúes con el arnés roto)
-5. Aplica la tabla de escalado de .claude/agents/cyber_leader.md
+```bash
+cyber-range status          # estado del sistema y memoria Hermes
+cat progress/current.md     # sesión activa (si existe)
+cat engagement_backlog.json # escenarios pendientes
 ```
 
 ---
 
-## Regla anti-hallucination (equivalente a anti-teléfono-descompuesto)
+## Restricciones absolutas
 
-En seguridad, el equivalente de un "teléfono descompuesto" es un **hallucinated finding**:
-el agente inventa evidencia que no existe en disco.
+Nunca hagas, sugieras ni implementes:
 
-**Protocolo:** cuando lances subagentes, instrúyeles para escribir sus resultados en
-`progress/impl_<scenario_id>.md` (el implementer) y `progress/review_<scenario_id>.md`
-(el reviewer). Devuélvete **solo la referencia al archivo**, no el contenido.
-
-Un finding que no tiene `artifacts/evidence/EVD-*.json` con SHA-256 verificable
-**no existe**. No lo reportes.
+- `allow_external_targets: true`
+- Código que ejecute sobre targets fuera del perimeter
+- Técnicas T1485, T1561, T1529 (hardcoded-bloqueadas)
+- Hallazgos sin evidencia SHA-256 en disco
+- Bypass de `PolicyEnforcer.check_scenario()`
+- Métricas porcentuales > 100
 
 ---
 
-## Cuándo NO aplica este rol
+## Comandos del sistema
 
-- Preguntas de lectura pura (explorar código, explicar arquitectura) → responde tú.
-- Cambios en `docs/`, `configs/`, `progress/` → puedes editar tú mismo.
-- Cambios en `AGENTS.md`, `CHECKPOINTS.md`, `engagement_backlog.json` → tú.
-- Añadir reglas al `rule_engine` o IoCs al `ioc_matcher` → tú (son datos, no código de ataque).
+```bash
+# Desarrollo
+pip install -e ".[dev,api]"
+pytest tests/unit/ -v
+cyber-range validate-config --config examples/local.yaml
+
+# Ejecución
+cyber-range run
+cyber-range run --mode agent     # Hermes multi-agente
+
+# Verificación
+cyber-range verify-evidence
+cyber-range status
+cyber-range memory show
+
+# API
+cyber-range serve-api            # http://127.0.0.1:8080
+```
+
+---
+
+## Patrón anti-hallucination
+
+Un finding existe si y solo si:
+
+1. `artifacts/evidence/EVD-*.json` existe en disco
+2. `hash_sha256` tiene 64 caracteres hex
+3. `blue_team_agent` emitió APPROVED (modo harness)
+
+Sin evidencia → no existe. No negociable.
+
+---
+
+## Estructura nueva (v2.0-beta)
+
+```
+src/cyber_range/        ← paquete productivo (pip install -e .)
+    cli/                ← cyber-range (click)
+    config/             ← Pydantic schema
+    policy/             ← PolicyEnforcer (fail-closed)
+    pipeline/           ← fases con estado
+    scoring/            ← [0,100] siempre
+    evidence/           ← SHA-256 + chain of custody
+    reporting/          ← report.md + report.json schema v1
+    logging/            ← JSONL sin secretos
+    api/                ← FastAPI (auth, CORS, errores JSON)
+    agents/
+        memory.py       ← SQLite cross-run
+        hermes.py       ← HermesOrchestrator + 9 agentes
+```
+
+---
+
+## Antes de cerrar sesión
+
+```bash
+cyber-range status                           # green
+# progress/current.md → plantilla vacía
+# progress/history.md → append sesión completada
+# engagement_backlog.json → sin más de 1 in_progress
+```
+
 ---
 
 *Powered by [AxisDynamics](https://axisdynamics.cl) · MIT License*

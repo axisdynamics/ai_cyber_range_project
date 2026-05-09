@@ -1,44 +1,96 @@
-# Verificacion — Como demostrar que un cambio funciona
+# Verificación — Cómo demostrar que un cambio funciona
 
-Antes de cualquier cambio:
-  ./init.sh   (debe terminar verde)
+---
 
-Smoke tests por capa:
+## Pre-vuelo (antes de cualquier cambio)
 
-Harness:
-  python3 -m python_orchestrator.harness.run_scenario --verify
+```bash
+cyber-range status            # debe mostrar último run + memoria
+cyber-range validate-config   # exit 0
+pytest tests/unit/ -q         # 115 passed
+```
 
-Pipeline:
-  PYTHONPATH=. python3 -m python_orchestrator.main --config configs/default.yaml
+---
 
-Detectores:
-  PYTHONPATH=. python3 -c "
-  import sys, json; sys.path.insert(0,'.')
-  from python_orchestrator.detectors.hybrid_detector import HybridDetector
-  f = json.load(open('python_orchestrator/reports/latest_report.json'))['findings'][:5]
-  r = HybridDetector().analyze(f, [])
-  print(f'OK: {len(r.all_alerts)} alertas')
-  "
+## Smoke tests por capa
 
-C service:
-  gcc -O2 -o c_service/build/lab_service c_service/src/lab_service.c
-  ./c_service/build/lab_service selftest
-  # SELFTEST_RESULT: passed=15 failed=0
+### C2 — src/cyber_range/ (paquete)
 
-Rust:
-  cargo build --manifest-path rust_validator/Cargo.toml
-  ./rust_validator/target/release/evidence_validator audit-evidence artifacts/evidence/
-  # EVIDENCE_AUDIT: invalid=0
+```bash
+cyber-range --help
+cyber-range validate-config --config examples/local.yaml
+python3 -c "from cyber_range.policy.enforcer import PolicyEnforcer; print('OK')"
+```
 
-FastAPI:
-  PYTHONPATH=. python3 -c "from web.api.main import _read_report; r=_read_report(); print('OK' if r else 'FAIL')"
+### C3 — Hermes
 
-Definicion de done:
-  - ./init.sh exit 0
-  - Smoke test de capa modificada pasa
-  - engagement_backlog.json sin mas de 1 in_progress
-  - progress/current.md en plantilla vacia (si se cerro la sesion)
-  - progress/history.md con entrada de la sesion completada
+```bash
+cyber-range run --mode agent --dry-run
+cyber-range memory show
+```
+
+### C4 — Pipeline ofensivo
+
+```bash
+cyber-range run --config examples/local.yaml
+# Esperado: exit 0, findings > 0, artifacts/runs/<RUN_ID>/ creado
+```
+
+### C5 — Detectores
+
+```bash
+python3 -c "
+import sys; sys.path.insert(0,'.')
+import json
+from python_orchestrator.detectors.hybrid_detector import HybridDetector
+findings = json.load(open('python_orchestrator/reports/latest_report.json'))['findings'][:5]
+r = HybridDetector().analyze(findings, [])
+assert len(r.all_alerts) > 0
+print(f'OK: {len(r.all_alerts)} alertas')
+"
+```
+
+### C6 — Rust
+
+```bash
+rust_validator/target/release/lab_service selftest
+# Esperado: SELFTEST_RESULT: passed=15 failed=0
+```
+
+### Evidencia
+
+```bash
+cyber-range verify-evidence
+# Esperado: "Toda la evidencia es válida", exit 0
+
+# Test tamper:
+f=$(ls artifacts/evidence/EVD-*.json | head -1)
+echo "corrupted" >> "$f"
+cyber-range verify-evidence
+# Esperado: "EVIDENCIA ALTERADA", exit 1
+git checkout "$f"  # restaurar
+```
+
+### API
+
+```bash
+cyber-range serve-api &
+sleep 2
+curl -s http://localhost:8080/health | python3 -m json.tool
+# Esperado: {"status": "ok", ...}
+kill %1
+```
+
+---
+
+## Definición de "done"
+
+- [ ] `cyber-range status` muestra sistema sano
+- [ ] `pytest tests/unit/ -q` — 0 failures
+- [ ] `cyber-range verify-evidence` — exit 0
+- [ ] `engagement_backlog.json` — sin >1 in_progress
+- [ ] `progress/current.md` — en plantilla vacía (si se cerró sesión)
+- [ ] `progress/history.md` — con entrada de la sesión
 
 ---
 

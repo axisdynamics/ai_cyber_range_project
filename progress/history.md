@@ -93,3 +93,110 @@ Motores determinísticos (RuleEngine, Sigma, IoC, Anomaly) + HybridDetector oper
 - Eliminados: `__pycache__/`, `*.pyc`, `*.bak`
 - Creados: `docs/ARCHITECTURE.md`, `docs/OPERATING_MODEL.md`, `docs/conventions.md`, `docs/verification.md`
 - Actualizado: `README.md`, `docs/OFFENSIVE_PLAYBOOK.md`
+
+---
+
+## Sesión 003 · 2026-05-08T23:00:00Z — v2.0-beta: CLI + Hermes + Productización
+
+### Alcance
+
+**Productización beta** según SPEC de producto. Tres bloques de trabajo.
+
+### Bloque A — src/cyber_range/ (paquete productivo)
+
+- `pyproject.toml` con entrypoints CLI (`cyber-range`)
+- `config/schema.py` — Pydantic v2: `CyberRangeConfig`, `EngagementConfig`, `LLMConfig`
+- `policy/enforcer.py` — `PolicyEnforcer.check_scenario()`, `assert_allowed()`, fail-closed
+- `pipeline/runner.py` — 11 fases con estado, run directories `artifacts/runs/<id>/`
+- `scoring/engine.py` — `risk_score`, `coverage_pct`, `detection_gap_pct` — todos [0,100]
+- `evidence/verifier.py` — SHA-256 recalculado, MODIFIED/MISSING/UNREFERENCED
+- `reporting/generator.py` — report.md + report.json schema v1
+- `logging/structured.py` — JSONL + redacción automática de secretos
+- `api/app.py` — FastAPI: auth X-API-Key, CORS allowlist, errores JSON, `/health /version /runs`
+
+### Bloque B — Hermes multi-agente
+
+- `agents/memory.py` — SQLite cross-run: runs, findings, gaps, learning
+- `agents/hermes.py` — `HermesOrchestrator`, 9 agentes especializados, `ThreadPoolExecutor(4)`
+- GapAnalysisAgent: prioriza técnicas por `gap_rate × avg_score`
+- Memoria persistente: `get_persistent_gaps()`, `get_priority_techniques()`, `get_technique_learning()`
+
+### Bloque C — CLI completo
+
+- `cyber-range run [--mode standard|agent] [--dry-run]`
+- `cyber-range validate-config` — exit 1 si inválido, exit 2 si no existe
+- `cyber-range verify-evidence [--run-id ID]` — exit 1 si modificada
+- `cyber-range generate-report [--run-id ID]`
+- `cyber-range serve-api [--port N] [--api-key KEY]`
+- `cyber-range status` — último run + memoria Hermes
+- `cyber-range memory show|clear|gaps`
+
+### Tests
+
+- 115 tests, 0 failures
+- Cobertura core: 85% (scoring 100%, policy 94%, config 95%, logging 95%)
+
+### Bugs corregidos
+
+- `coverage_pct` nunca supera 100% (fix + regression test)
+- `python_orchestrator/main.py` `KeyError: 'program'` con nuevos configs
+- `examples/local.yaml` compatible con legacy orchestrator
+
+### Estado al cierre
+
+- [x] C1 config válida
+- [x] C2 pipeline sin errores
+- [x] C3 soberanía intacta
+- [x] C4 evidencias con SHA-256
+- [x] C5 tests 115/115
+- [x] C6 Hermes con memoria
+- [x] C7 API operativa
+- [x] Todos los .md actualizados
+
+---
+
+## Sesión 003 · 2026-05-09T00:06:00Z — Beta productivo + Hermes multi-agente
+
+**Alcance:** Productización completa siguiendo spec Spec Driven Development.
+
+### src/cyber_range/ (nuevo paquete Python)
+
+- `config/schema.py` — Pydantic v2, fail-closed, `allow_external_targets` rechazado siempre
+- `policy/enforcer.py` — PolicyEnforcer stateless, T1485/T1561/T1529 hardcoded, IPs externas bloqueadas
+- `scoring/engine.py` — Determinístico, coverage_pct NUNCA > 100% (fix bug 105.6%), risk_score/confidence/gap/remediation_priority
+- `evidence/verifier.py` — SHA-256 recalculado, estados: valid/missing/modified/unreferenced/no_hash
+- `reporting/generator.py` — report.md + report.json schema v1 estable
+- `logging/structured.py` — JSONL, redacción automática de secretos
+- `pipeline/runner.py` — Fases con estado (pending/running/success/failed/skipped/blocked)
+- `api/app.py` — FastAPI: auth X-API-Key, CORS allowlist (sin *), errores JSON estructurados, /health /version /runs
+- `cli/main.py` — CLI completo (run/validate-config/verify-evidence/generate-report/serve-api/status/memory)
+
+### Hermes multi-agente
+
+- `agents/memory.py` — AgentMemory SQLite cross-run: runs, findings, gaps, learning tables
+- `agents/hermes.py` — HermesOrchestrator: GapAnalysisAgent + 9 agentes especializados paralelos
+- Memoria: `get_persistent_gaps()`, `get_priority_techniques()`, `get_technique_learning()`
+- CLI: `cyber-range run --mode agent`, `cyber-range memory show/clear/gaps`
+
+### pyproject.toml + packaging
+
+- `pip install -e .` → `cyber-range` en PATH
+- Entrypoints: run/validate-config/verify-evidence/generate-report/serve-api/status/memory
+- Dev deps: pytest/pytest-cov/ruff/mypy
+- CI: `.github/workflows/ci.yml`
+
+### Tests
+
+- 115 tests, 0 failures
+- Cobertura 85% en módulos core (scoring:100%, policy:94%, config:95%, logging:95%, reporting:76%)
+- Nuevos: test_memory.py (10 tests), test_logging.py (15), test_evidence.py (7)
+
+### Estado del sistema al cierre
+
+- [x] C1 Config válida
+- [x] C2 Pipeline ejecuta sin errores
+- [x] C3 Soberanía intacta
+- [x] C4 Evidencias verificables
+- [x] C5 Tests pasan (115/0)
+- [x] C6 Hermes con memoria (3 runs en memory.db)
+- [x] C7 API operativa

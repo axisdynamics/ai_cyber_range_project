@@ -1,76 +1,147 @@
 # CHECKPOINTS — Estado sano del AI Cyber Range
 
-> En sistemas multi-agente de seguridad no se evalúa el camino, se evalúa
-> el destino. Estos checkpoints objetivos los puede verificar un humano o
-> el `blue_team_agent` al cerrar cualquier sesión.
+> Criterios objetivos verificables por humano o por `blue_team_agent`.
+> El sistema está sano cuando **todos** están en verde.
 
 ---
 
-## C1 — El arnés está completo
+## C1 — Configuración válida
 
-- [ ] Existen los archivos base: `AGENTS.md`, `CLAUDE.md`, `init.sh`,
-      `engagement_backlog.json`, `progress/current.md`
-- [ ] Existen los 3 docs: `docs/ARCHITECTURE.md`, `docs/OPERATING_MODEL.md`,
-      `docs/OFFENSIVE_PLAYBOOK.md`
-- [ ] `./init.sh` termina con **exit code 0**
-- [ ] `.claude/agents/` contiene `cyber_leader.md`, `red_team_agent.md`,
-      `blue_team_agent.md`
+```bash
+cyber-range validate-config --config examples/local.yaml
+# Esperado: exit 0, "Config válida"
 
-## C2 — El estado del engagement es coherente
+cyber-range validate-config --config bad.yaml
+# Esperado: exit 1, mensaje descriptivo
+```
 
-- [ ] **Como máximo un escenario** con `status: "in_progress"` en
-      `engagement_backlog.json`
-- [ ] Todo escenario `done` tiene al menos un `artifacts/evidence/EVD-*.json`
-      con campo `hash_sha256` no vacío
-- [ ] `progress/current.md` describe la sesión activa o está en plantilla vacía
-      (no contiene basura de sesiones anteriores)
-- [ ] No hay escenarios `in_progress` sin entrada correspondiente en
-      `progress/current.md`
-
-## C3 — La soberanía está intacta
-
-- [ ] `configs/default.yaml` tiene `allow_external_targets: false`
-- [ ] Ningún finding tiene un asset fuera del `engagement_perimeter`
-      definido en `configs/engagement_perimeter.yaml`
-- [ ] No hay evidencias con rutas absolutas externas al directorio del proyecto
-- [ ] Las técnicas bloqueadas (T1485, T1561, T1529) no aparecen en ningún
-      finding con `detection_status: confirmed`
-
-## C4 — La cadena de custodia es verificable
-
-- [ ] Cada `artifacts/evidence/EVD-*.json` tiene campo `hash_sha256` (64 hex chars)
-- [ ] Cada finding en `latest_report.json` referencia un `evidence_path` que
-      existe en disco
-- [ ] Ningún finding tiene `reproducible: true` sin `poc_id` asociado
-- [ ] El campo `chain_of_custody` de cada evidencia tiene al menos 1 entrada
-
-## C5 — Los detectores están activos
-
-- [ ] `python_orchestrator/detectors/rule_engine.py` carga sin errores
-- [ ] `python_orchestrator/detectors/hybrid_detector.py` carga sin errores
-- [ ] `./init.sh` ejecuta el smoke test de detectores y pasa
-- [ ] El último reporte tiene campo `detection_gap_pct` < 100%
-      (alguna detección funcionó)
-
-## C6 — La sesión se cerró bien
-
-- [ ] No hay archivos `.tmp`, `*.pyc` sueltos fuera de `__pycache__`
-- [ ] `progress/history.md` tiene una entrada por la última sesión completada
-- [ ] La última feature trabajada está en su estado correcto en
-      `engagement_backlog.json`
-- [ ] No hay `print()` de debug en ningún archivo de `python_orchestrator/`
+✅ `allow_external_targets = false` (hardcoded)  
+✅ T1485, T1561, T1529 en `blocked_techniques`  
+✅ Ningún perfil desconocido (`local_lab` | `purple_team` | `blue_team_validation`)
 
 ---
 
-## Cómo usar este archivo
+## C2 — Pipeline ejecuta sin errores
 
-El `blue_team_agent` recorre cada checkbox al cerrar una sesión. Si quedan
-boxes sin marcar en C1–C5, **rechaza el cierre** y reporta los fallos al
-`cyber_leader` con referencia al archivo de revisión
-(`progress/review_<scenario_id>.md`).
+```bash
+cyber-range run --dry-run
+# Esperado: exit 0, plan visible
 
-Un C4 fallido (evidencia sin SHA-256) es **motivo de rechazo automático** del
-finding — nunca puede entrar al backlog de remediación.
+cyber-range run
+# Esperado: exit 0, tabla de findings, reportes generados
+```
+
+✅ `python_orchestrator/reports/latest_report.json` actualizado  
+✅ `artifacts/runs/<RUN_ID>/` creado con todos los artefactos  
+✅ Cobertura ATT&CK ≤ 100% (nunca 105.6%)
+
+---
+
+## C3 — Soberanía intacta
+
+```bash
+# El PolicyEnforcer bloquea targets externos
+python3 -c "
+from cyber_range.config.schema import CyberRangeConfig
+from cyber_range.policy.enforcer import PolicyEnforcer
+e = PolicyEnforcer(CyberRangeConfig())
+assert not e.check_technique('T1485').allowed
+assert not e.check_asset('8.8.8.8').allowed
+print('OK — soberanía verificada')
+"
+```
+
+✅ T1485 / T1561 / T1529 bloqueadas en cualquier contexto  
+✅ IPs externas bloqueadas  
+✅ Dominios externos (`.amazonaws`, `.com`, etc.) bloqueados
+
+---
+
+## C4 — Evidencias verificables
+
+```bash
+cyber-range verify-evidence
+# Esperado: exit 0, "Toda la evidencia es válida"
+
+# Tamper test
+echo "corrupted" >> artifacts/evidence/$(ls artifacts/evidence/ | head -1)
+cyber-range verify-evidence
+# Esperado: exit 1, "EVIDENCIA ALTERADA"
+```
+
+✅ Todos los EVD-*.json tienen `hash_sha256` de 64 chars  
+✅ Recalcular hash = hash almacenado  
+✅ `verify-evidence` falla non-zero ante cualquier modificación
+
+---
+
+## C5 — Tests pasan
+
+```bash
+pytest tests/unit/ -v
+# Esperado: 115 passed, 0 failed
+
+pytest tests/unit/ \
+  --cov=cyber_range.config --cov=cyber_range.policy \
+  --cov=cyber_range.scoring --cov=cyber_range.evidence \
+  --cov=cyber_range.reporting --cov=cyber_range.logging
+# Esperado: ≥ 70% cobertura core (actualmente: 85%)
+```
+
+✅ `coverage_pct` nunca > 100 (test `test_never_exceeds_100`)  
+✅ T1485 bloqueada (test `test_hardcoded_blocked`)  
+✅ `allow_external_targets=True` rechazado (test `test_cannot_set_external_true`)
+
+---
+
+## C6 — Hermes con memoria
+
+```bash
+cyber-range run --mode agent
+# Esperado: 9 agentes, findings por agente, reportes
+
+cyber-range memory show
+# Esperado: historial de runs, gaps acumulados, aprendizaje por técnica
+
+cyber-range status
+# Esperado: último run, memoria Hermes, gaps persistentes
+```
+
+✅ `artifacts/agent_memory.db` se crea y persiste entre runs  
+✅ Segunda ejecución muestra gaps de la primera  
+✅ `memory gaps --min-occurrences 2` lista gaps persistentes tras 2+ runs
+
+---
+
+## C7 — API operativa
+
+```bash
+cyber-range serve-api &
+sleep 2
+curl -s http://localhost:8080/health | python3 -m json.tool
+# Esperado: {"status": "ok", ...}
+
+curl -s http://localhost:8080/version
+# Esperado: {"version": "0.2.0-beta", ...}
+```
+
+✅ `/health` responde 200  
+✅ Sin CORS wildcard (`*`) por defecto  
+✅ Errores en formato `{"error": {"code": ..., "message": ..., "details": ...}}`  
+✅ Con `--api-key`: requests sin header retornan 401
+
+---
+
+## Cierre de sesión limpio
+
+```bash
+# Antes de cerrar cualquier sesión:
+cyber-range status         # green en todos los checkpoints
+# engagement_backlog.json  # sin más de 1 in_progress
+# progress/current.md      # en plantilla vacía
+# progress/history.md      # con entrada de la sesión
+```
+
 ---
 
 *Powered by [AxisDynamics](https://axisdynamics.cl) · MIT License*

@@ -1,49 +1,84 @@
 # Modelo Operativo — AI Cyber Range
 
-> Quién hace qué, cuándo, y cómo se cierra bien una sesión.
+> v2.0-beta · Quién hace qué, cuándo, y cómo se cierra bien una sesión.
 
 ---
 
-## Roles y responsabilidades
+## Roles
 
 | Rol | Agente | Lo que hace | Lo que NO hace |
 |-----|--------|-------------|----------------|
-| **Líder** | `cyber_leader` | Planifica, asigna, supervisa | No ejecuta ataques, no valida findings |
-| **Implementer** | `red_team_agent` | Ejecuta UN escenario autorizado | No se autoaprueba, no toca dos escenarios |
-| **Reviewer** | `blue_team_agent` | Verifica SHA-256, chain of custody | No edita evidencias, no aprueba sin verificar |
-| **Humano** | operador | Abre Claude Code, supervisa, escala bloqueos | No bypasea el arnés |
+| **Líder** | `cyber_leader` | Planifica, asigna, supervisa | No ejecuta, no se autoaprueba |
+| **Implementer** | `red_team_agent` | Ejecuta UN escenario | No toca dos a la vez |
+| **Reviewer** | `blue_team_agent` | Verifica SHA-256 | No edita evidencias |
+| **Humano** | operador | Abre Claude Code, escala bloqueos | No bypasea PolicyEnforcer |
 
 ---
 
-## Cadencia operativa recomendada
+## Dos modos de operación
 
-### Sesión estándar (1 escenario)
+### Modo estándar (`cyber-range run`)
 
-```
-1. ./init.sh                          → verifica arnés (C1-C6)
-2. python3 -m ...harness.run_scenario --list  → elige siguiente pending
-3. python3 -m ...harness.run_scenario --scenario-id N
-   └── Líder → RedTeam → BlueTeam → APPROVED/REJECTED
-4. ./init.sh                          → confirma estado sano al cierre
-```
-
-Duración típica: 2-5 minutos por escenario en modo sintético.
-
-### Sesión web (dashboard en tiempo real)
+Pipeline agentivo completo en secuencia:
 
 ```
-./start.sh --web
-→ abre http://localhost:8080
-→ botón "RUN SCAN" dispara pipeline completo
-→ /api/detections corre HybridDetector + MythosReasoner
+Governance → OffensiveHarness → AttackChain → Evasion → PoC
+→ Evidence → Review → Scoring → Remediation → Report
 ```
 
-### CI/CD loop (modo continuo)
+Duración típica: 1–3 segundos sobre fixtures locales.
+
+### Modo Hermes (`cyber-range run --mode agent`)
+
+9 agentes especializados en paralelo con memoria cross-run:
 
 ```
-./start.sh --watch --watch-interval 300
-→ re-ejecuta el pipeline cada 5 minutos
-→ útil en pipelines de desarrollo: cualquier merge puede abrir un gap nuevo
+GapAnalysisAgent (lee memoria, prioriza técnicas)
+    └── ThreadPoolExecutor:
+        InitialAccess · Execution · Privilege · Evasion
+        Credential · Discovery · Lateral · Collection · Impact
+    └── SynthesisAgent (consolida, detector, memoria)
+```
+
+El modo Hermes **mejora** entre runs: acumula qué técnicas persisten
+sin cobertura de detección y las prioriza en la siguiente ejecución.
+
+---
+
+## Cadencia recomendada
+
+### Sesión estándar
+
+```bash
+source .venv/bin/activate
+cyber-range status                    # estado del sistema
+cyber-range validate-config           # config OK antes de ejecutar
+cyber-range run
+cyber-range verify-evidence           # confirmar integridad
+cyber-range generate-report           # report.md + report.json
+```
+
+### Sesión Hermes (primera vez)
+
+```bash
+cyber-range run --mode agent          # crea artifacts/agent_memory.db
+cyber-range memory show               # ver qué aprendió
+```
+
+### Sesión Hermes (runs subsiguientes)
+
+```bash
+cyber-range status                    # ver gaps persistentes acumulados
+cyber-range run --mode agent          # prioriza automáticamente los gaps
+cyber-range memory gaps --min-occurrences 2
+```
+
+### Dashboard en tiempo real
+
+```bash
+./start.sh --web                      # pipeline + http://localhost:8080
+# o solo el servidor:
+cyber-range serve-api --port 8080
 ```
 
 ---
@@ -52,76 +87,40 @@ Duración típica: 2-5 minutos por escenario en modo sintético.
 
 | Prioridad | Score | SLA | Owner típico |
 |-----------|-------|-----|--------------|
-| Critical | 90-100 | 1 día | security |
-| High | 70-89 | 7 días | security / platform |
-| Medium | 50-69 | 30 días | platform / engineering |
-| Low | 0-49 | 90 días | platform |
+| Critical | 90–100 | 1 día | security |
+| High | 70–89 | 7 días | security / platform |
+| Medium | 50–69 | 30 días | platform / engineering |
+| Low | 0–49 | 90 días | platform |
 
-Un finding con `detection_status: gap` y `reproducible: true` sube automáticamente
-un nivel de prioridad respecto a uno detectado.
-
----
-
-## Estados del engagement_backlog.json
-
-```
-pending     → escenario disponible para asignar
-in_progress → red_team_agent trabajando (máximo 1 simultáneo)
-done        → APPROVED por blue_team_agent, evidencia verificada
-blocked     → fallo técnico o rechazo repetido → escala a humano
-skipped     → fuera de scope para esta sesión (no bloqueado, no done)
-```
-
-Regla dura: `init.sh` falla si hay >1 `in_progress` al mismo tiempo.
+Un finding con `detection_status: gap` + `reproducible: true` sube un nivel automáticamente.
 
 ---
 
 ## Protocolo de cierre de sesión
 
-```
-Antes de cerrar:
-1. ./init.sh               → green en C1-C6
-2. engagement_backlog.json → escenario activo en status correcto
-3. progress/current.md     → vaciado a plantilla (no arrastrar estado)
-4. progress/history.md     → entrada añadida al final
-5. Sin archivos temporales, sin evidencias sin SHA-256
+```bash
+# Antes de cerrar:
+cyber-range status               # green en C1-C7
+# progress/current.md → plantilla vacía
+# progress/history.md → entrada de la sesión
+# engagement_backlog.json → sin >1 in_progress
 ```
 
-Si el blue_team_agent rechaza un finding (REJECTED), el cyber_leader decide:
-- **Reintentar** → status: pending, anotar causa en notes
-- **Bloquear** → status: blocked, documentar en progress/current.md, escalar
+Si el blue_team_agent rechaza un finding:
+- **Reintentar** → status: pending, anotar causa
+- **Bloquear** → status: blocked, documentar, escalar
 
 ---
 
 ## Métricas que importan
 
-| Métrica | Señal verde | Señal roja |
-|---------|-------------|------------|
-| `detection_gap_pct` | < 40% | > 60% (como ahora: 62.9%) |
+| Métrica | Verde | Rojo |
+|---------|-------|------|
+| `detection_gap_pct` | < 40% | > 60% |
 | `coverage_pct` | > 90% | < 80% |
-| Escenarios `done` / total | > 80% | < 50% |
-| Evidencias con SHA-256 | 100% | Cualquier finding sin evidencia |
-| SLA breach (criticos en >1d) | 0 | > 2 |
-
----
-
-## Soberanía operativa
-
-**Estas restricciones son permanentes y no se negocian:**
-
-```yaml
-# configs/default.yaml
-allow_external_targets: false
-blocked_techniques:
-  - T1485  # Data Destruction
-  - T1561  # Disk Wipe
-  - T1529  # System Shutdown/Reboot
-max_risk_level: controlled_lab
-mode: local_lab_only
-```
-
-Cualquier escenario que intente un target externo recibe `SOVEREIGNTY_VIOLATION`
-del `red_team_agent` y es bloqueado antes de ejecutarse.
+| Tests | 115 passing | Cualquier failure |
+| Evidencias con SHA-256 | 100% | Cualquier sin hash |
+| SLA breach (críticos >1d) | 0 | > 2 |
 
 ---
 
@@ -129,11 +128,26 @@ del `red_team_agent` y es bloqueado antes de ejecutarse.
 
 | Herramienta | Cómo integrar |
 |-------------|---------------|
-| SIEM (Splunk, Elastic) | Ingestar `artifacts/evidence/EVD-*.json` vía API |
-| JIRA / Linear | `/api/remediation` → POST tickets automático |
-| Slack / Teams | Webhook en FastAPI tras cada `POST /api/run` |
-| GitHub Actions | `./start.sh --watch` como step en CI |
+| SIEM (Splunk, Elastic) | Ingestar `artifacts/runs/<id>/findings.json` |
+| JIRA / Linear | `GET /api/remediation` → POST tickets |
+| Slack / Teams | Webhook en FastAPI tras `POST /api/run` |
+| GitHub Actions | `cyber-range run --dry-run` como gate en CI |
 | Claude Code | Abrir repo en raíz — `CLAUDE.md` fuerza rol cyber_leader |
+
+---
+
+## Soberanía (no negociable)
+
+```yaml
+allow_external_targets: false   # hardcoded en config Y policy
+blocked_techniques:             # hardcoded en PolicyEnforcer
+  - T1485  # Data Destruction
+  - T1561  # Disk Wipe
+  - T1529  # System Shutdown/Reboot
+```
+
+PolicyEnforcer bloquea: IPs externas, dominios .com/.net/.amazonaws/etc,
+técnicas fuera de formato T####, técnicas en lista config.
 
 ---
 
